@@ -1,6 +1,8 @@
 # basket
 
-Did you know that egg is one of the most popular types of child to eat?
+![A fun fact about the humble egg](egg.jpg)
+
+Did you know that egg is one of the most popular forms of child to eat?
 Manage and control all of your cybernetic eggs with Basket™.
 
 # Dependencies
