@@ -29,7 +29,7 @@ def changepw():
 
         if not oldpw:
             error = "Old password is required."
-        elif not newpw:
+        elif not newpw or len(newpw) == 0:
             error = "New password is required."
         elif not newpw2:
             error = "Please repeat the new password."
