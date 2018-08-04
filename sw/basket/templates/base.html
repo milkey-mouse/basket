@@ -1,0 +1,51 @@
+{% set pages = [
+    ('index', 'Diagnostics')
+] -%}
+{% set page_name = page_name|default(dict(pages)[active_page]) -%}
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>{{ page_name }} - Basket</title>
+  <link rel="stylesheet" href="/static/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/sticky-footer.css">
+  <style>
+    .white-icon path { fill: white; }
+    .navbar-brand {font-variant: small-caps; font-weight: bold}
+  </style>
+  {% block head %}
+  {% endblock %}
+</head>
+<body>
+  <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+    <a class="navbar-brand" href="#">Basket</a>
+    <ul class="navbar-nav mr-auto">
+    {% for id, name in pages %}
+      <li class="nav-item{% if id == active_page %} active{% endif %}">
+        <a class="nav-link" href="{{ url_for(id) }}">Diagnostics{% if id == active_page %}<span class="sr-only"> (current)</span>{% endif %}</a>
+      </li>
+    {% endfor %}
+    </ul>
+    <ul class="navbar-nav px-3">
+      <li class="nav-item">
+        <a class="nav-link white-icon" href="{{ url_for('auth.changepw') }}" title="Change password">{{ octicon('key') }}</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link white-icon" href="{{ url_for('auth.logout') }}" title="Log out">{{ octicon('sign-out') }}</a>
+      </li>
+    </ul>
+  </nav>
+  <main role="main" class="container">
+    <h1>{% block icon %}{% endblock %} {{ page_name }}</h1>
+    {% block content %}
+    {% endblock %}
+  </main>
+  <footer class="footer">
+    <div class="container">
+      <span class="text-muted">
+        Made with 👁️👁️ and 🥚. Copyright © 2018 Milkey Mouse.
+      </span>
+    </div>
+  </footer>
+</body>
+</html>
