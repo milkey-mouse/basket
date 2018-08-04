@@ -25,11 +25,16 @@ def changepw():
     if request.method == "POST":
         oldpw = request.form["oldpw"]
         newpw = request.form["newpw"]
+        newpw2 = request.form["newpw2"]
 
         if not oldpw:
             error = "Old password is required."
         elif not newpw:
             error = "New password is required."
+        elif not newpw2:
+            error = "Please repeat the new password."
+        elif newpw != newpw2:
+            error = "New passwords do not match."
         else:
             with current_app.open_instance_resource("password", "r") as f:
                 hash = f.read()
