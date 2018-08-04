@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Basket</title>
+<link rel="stylesheet" href="/static/bootstrap.min.css">
+<link rel="stylesheet" href="/static/signin.css">
+</head>
+<body class="text-center">
+  <form class="form-signin" method="post">
+    <h1 class="h3 mb-3 font-weight-normal">Change password</h1>
+{% if error is not none %}
+    <div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+    <input type="password" name="oldpw" class="form-control" placeholder="Old password" required autofocus>
+    <input type="password" name="newpw" class="form-control" placeholder="New password" required>
+    <button class="btn btn-lg btn-primary btn-block" type="submit">Change password</button>
+  </form>
+</body>
+</html>

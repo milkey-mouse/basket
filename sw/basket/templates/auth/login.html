@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Basket</title>
+<link rel="stylesheet" href="/static/bootstrap.min.css">
+<link rel="stylesheet" href="/static/signin.css">
+</head>
+<body class="text-center">
+  <form class="form-signin" method="post">
+    <img class="mb-4" src="/static/bouncer.png"/>
+    <input type="password" name="password" class="form-control" placeholder="{{ placeholder if placeholder is not none else 'What\'s the password?' }}" required autofocus>
+  </form>
+</body>
+</html>
