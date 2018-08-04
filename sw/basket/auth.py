@@ -72,7 +72,7 @@ def login():
                 hash = f.read()
 
             if not check_password_hash(hash, password):
-                error = "Wrong password."
+                error = "Nope."
 
         if error is None:
             session["logged_in"] = True

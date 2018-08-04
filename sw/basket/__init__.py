@@ -24,10 +24,15 @@ def create_app():
         with app.open_instance_resource("password", "w") as f:
             f.write(generate_password_hash(password))
 
-    from . import auth, ctrl
+    app.jinja_env.lstrip_blocks = True
+    app.jinja_env.trim_blocks = True
+
+    from . import auth, ctrl, style
     app.register_blueprint(auth.bp)
     app.register_blueprint(ctrl.bp)
 
     app.add_url_rule("/", endpoint="index")
+
+    app.jinja_env.globals.update(octicon=style.octicon)
 
     return app
