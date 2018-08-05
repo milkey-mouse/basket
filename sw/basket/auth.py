@@ -3,6 +3,7 @@ import functools
 from flask import Blueprint, current_app, session, redirect, request, url_for, render_template
 from werkzeug.security import check_password_hash, generate_password_hash
 from .utils import with_query_string
+from .db import get_db
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -36,19 +37,15 @@ def changepw():
         elif newpw != newpw2:
             error = "New passwords do not match."
         else:
-            with current_app.open_instance_resource("password", "r") as f:
-                hash = f.read()
+            db = get_db()
+            hash = db.execute("SELECT passwordHash FROM singleton").fetchone()["passwordHash"]
             if not check_password_hash(hash, oldpw):
                 error = "Incorrect old password."
 
         if error is None:
-            with current_app.open_instance_resource("password.tmp", "w") as f:
-                f.write(generate_password_hash(newpw))
-
-            os.rename(
-                os.path.join(current_app.instance_path, "password.tmp"),
-                os.path.join(current_app.instance_path, "password")
-            )
+            newHash = generate_password_hash(newpw)
+            db.execute("UPDATE singleton SET passwordHash = ?", (newHash,))
+            db.commit()
 
             # log everyone out by invalidating the signature of old session cookies
             current_app.secret_key = os.urandom(32)
@@ -68,9 +65,7 @@ def login():
         elif len(password) == 0:
             error = "Enter a password."
         else:
-            with current_app.open_instance_resource("password", "r") as f:
-                hash = f.read()
-
+            hash = get_db().execute("SELECT passwordHash FROM singleton").fetchone()["passwordHash"]
             if not check_password_hash(hash, password):
                 error = "Nope."
 
