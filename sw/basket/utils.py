@@ -28,7 +28,7 @@ def get_temp():
     try:
         try:
             # try to use the Broadcom proprietary cmd for rpi
-            p = subprocess.run(["vcgencmd", "measure_temp"], check=True)
+            p = subprocess.run(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE, check=True)
             temp = float(p.stdout.decode("utf-8").split("=")[1].split("'")[0])
         except FileNotFoundError:
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
@@ -36,3 +36,11 @@ def get_temp():
     except FileNotFoundError:
         return "Unknown"
     return "{} °C".format(temp)
+
+
+def get_ble_addr():
+    try:
+        p = subprocess.run(["hcitool", "dev"], stdout=subprocess.PIPE, check=True)
+        return p.stdout.decode("utf-8").splitlines()[-1].split()[-1]
+    except FileNotFoundError:
+        return "Unknown"

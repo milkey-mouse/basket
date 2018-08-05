@@ -1,7 +1,7 @@
 from socket import gethostname, gethostbyname
 from operator import itemgetter
 from flask import Blueprint, render_template, redirect, url_for
-from .utils import ip_addresses, get_temp
+from .utils import ip_addresses, get_temp, get_ble_addr
 from .auth import login_required
 from .db import get_db
 
@@ -20,6 +20,7 @@ def index():
     sysinfo = [
         ("Hostname", gethostname()),
         ("IP address", ip_addresses()),
+        ("Host Bluetooth address", get_ble_addr()),
         ("CPU temp", get_temp()),
     ]
     return render_template("ctrl/index.html", checklist=checklist, sysinfo=sysinfo)
