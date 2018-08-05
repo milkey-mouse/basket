@@ -19,7 +19,8 @@ def create_app():
     app.jinja_env.lstrip_blocks = True
     app.jinja_env.trim_blocks = True
 
-    from . import db
+    from . import worker, db
+    worker.init_app(app)
     db.init_app(app)
 
     from . import auth, ctrl

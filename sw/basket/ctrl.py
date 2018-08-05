@@ -3,6 +3,7 @@ from operator import itemgetter
 from flask import Blueprint, render_template, redirect, url_for
 from .utils import ip_addresses, get_temp
 from .auth import login_required
+from .db import get_db
 
 bp = Blueprint("ctrl", __name__)
 
@@ -30,4 +31,5 @@ def bt():
 @bp.route("/bluetooth")
 @login_required
 def bluetooth():
-    return render_template("ctrl/bluetooth.html", devices=[{"macaddr": "12::34", "name": "meme"}, {"macaddr": "34::56", "name": None}])
+    devices = get_db().execute("SELECT * FROM bluetooth")
+    return render_template("ctrl/bluetooth.html", devices=devices)
