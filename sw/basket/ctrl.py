@@ -28,5 +28,6 @@ def bt():
     return redirect(url_for(".bluetooth"))
 
 @bp.route("/bluetooth")
+@login_required
 def bluetooth():
     return render_template("ctrl/bluetooth.html", devices=[{"macaddr": "12::34", "name": "meme"}, {"macaddr": "34::56", "name": None}])
