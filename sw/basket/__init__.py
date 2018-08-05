@@ -5,12 +5,14 @@ from flask import Flask, session, redirect, url_for
 
 
 def create_app():
-    app = Flask(__name__, instance_relative_config=True)
+    app = Flask(__name__)
     app.config.from_mapping(
         # the secret key doesn't need to persist; the user can just relogin
         SECRET_KEY=("dev" if app.debug else os.urandom(32)),
-        DATABASE=os.path.join(app.instance_path, "basket.sqlite")
+        DATABASE=os.path.join(app.instance_path, "basket.sqlite"),
+        COMMAND_PREFIX=[],
     )
+    app.config.from_pyfile("config.py", silent=True)
 
     os.makedirs(app.instance_path, exist_ok=True)
 

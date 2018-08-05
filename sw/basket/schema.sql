@@ -3,11 +3,13 @@ DROP TABLE IF EXISTS singleton;
 
 CREATE TABLE bluetooth (
     macaddr TEXT UNIQUE NOT NULL,
-    name TEXT
+    name TEXT,
+    hostdev BOOLEAN
 );
 
 CREATE TABLE singleton (
     idx INTEGER NOT NULL UNIQUE
       DEFAULT 1 CHECK (idx = 1),
-    passwordHash TEXT NOT NULL
+    passwordHash TEXT NOT NULL,
+    bluezVer TEXT
 );

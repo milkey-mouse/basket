@@ -1,7 +1,7 @@
 from socket import gethostname, gethostbyname
 from operator import itemgetter
 from flask import Blueprint, render_template, redirect, url_for
-from .utils import ip_addresses, get_temp, get_ble_addr
+from .utils import ip_addresses, get_temp, get_ble_addr, get_bluez_version
 from .auth import login_required
 from .db import get_db
 
@@ -20,17 +20,20 @@ def index():
     sysinfo = [
         ("Hostname", gethostname()),
         ("IP address", ip_addresses()),
-        ("Host Bluetooth address", get_ble_addr()),
+        ("BlueZ version", get_bluez_version()),
+        ("Bluetooth controller", get_ble_addr()),
         ("CPU temp", get_temp()),
     ]
     return render_template("ctrl/index.html", checklist=checklist, sysinfo=sysinfo)
+
 
 @bp.route("/bt")
 def bt():
     return redirect(url_for(".bluetooth"))
 
+
 @bp.route("/bluetooth")
 @login_required
 def bluetooth():
-    devices = get_db().execute("SELECT * FROM bluetooth")
+    devices = get_db().execute("SELECT * FROM bluetooth WHERE hostdev = 0")
     return render_template("ctrl/bluetooth.html", devices=devices)

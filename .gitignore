@@ -110,3 +110,4 @@ instance/
 .webassets-cache
 docs/_build/
 venv/
+config.py
