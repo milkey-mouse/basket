@@ -3,7 +3,9 @@ DROP TABLE IF EXISTS singleton;
 
 CREATE TABLE bluetooth (
     macaddr TEXT UNIQUE NOT NULL,
-    name TEXT
+    name TEXT,
+    rssi INTEGER,
+    hostdev BOOLEAN
 );
 
 CREATE TABLE singleton (

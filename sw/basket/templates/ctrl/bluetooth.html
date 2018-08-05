@@ -11,7 +11,7 @@
       {% set is_egg = device['name'] is not none and device['name'].lower().startswith('egg') -%}
       <li>
         <span class="btn-group"{% if is_egg %} title="Potential egg"{% endif %}>
-          <label class="btn btn-outline-{{ 'primary' if is_egg else 'secondary' }}" disabled>{{ icon('radio-tower') }}</label>
+          <label class="btn btn-outline-{{ 'primary' if is_egg else 'secondary' }}" title="RSSI: {{ device['rssi'] if device['rssi'] is not none else 'unknown' }}" disabled>{{ icon('radio-tower') }}</label>
           <label class="btn btn-outline-{{ 'primary' if is_egg else 'secondary' }}"><samp>{{ device['macaddr'] }}{% if device['name'] is not none %}</samp> ({{ device['name'] }}){% endif %}</label>
         </span>
       </li>

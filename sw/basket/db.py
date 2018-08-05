@@ -31,7 +31,8 @@ def init_db():
         db.executescript(f.read().decode("utf-8"))
 
     password = getpass("Enter an initial password for the web interface: ")
-    db.execute("INSERT INTO singleton values (1, ?)", (generate_password_hash(password),))
+    db.execute("INSERT INTO singleton VALUES(1, ?)",
+               (generate_password_hash(password),))
     db.commit()
 
 
