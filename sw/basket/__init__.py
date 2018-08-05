@@ -1,5 +1,5 @@
 import os
-import base64
+from socket import gethostname
 from werkzeug.security import generate_password_hash
 from flask import Flask, session, redirect, url_for
 
@@ -15,7 +15,7 @@ def create_app():
     os.makedirs(app.instance_path, exist_ok=True)
 
     from . import style
-    app.jinja_env.globals.update(octicon=style.octicon)
+    app.jinja_env.globals.update(icon=style.icon, gethostname=gethostname)
     app.jinja_env.lstrip_blocks = True
     app.jinja_env.trim_blocks = True
 

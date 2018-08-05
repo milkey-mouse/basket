@@ -1,0 +1,19 @@
+{% extends "/base.html" %}
+{% set active_page = "ctrl.bluetooth" %}
+{% block icon %}{{ icon('bluetooth') }}{% endblock %}
+{% block head %}
+  <style>.form-group {list-style-type: none}</style>
+{% endblock %}
+{% block content %}
+    <p>BLE devices in range of this Basket instance:</p>
+    <ul class="form-group">
+      {% for device in devices %}
+      <li>
+        <span class="btn-group">
+          <label class="btn btn-outline-secondary disabled">{{ icon('radio-tower') }}</label>
+          <label class="btn btn-outline-secondary">{{ device['macaddr'] }}{% if device['name'] is not none %} ({{ device['name'] }}){% endif %}</label>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+{% endblock %}

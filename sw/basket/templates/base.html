@@ -1,5 +1,6 @@
 {% set pages = [
-    ('index', 'Diagnostics')
+    ('ctrl.index', 'Diagnostics'),
+    ('ctrl.bluetooth', 'Bluetooth'),
 ] -%}
 {% set page_name = page_name|default(dict(pages)[active_page]) -%}
 <!DOCTYPE html>
@@ -22,16 +23,16 @@
     <ul class="navbar-nav mr-auto">
     {% for id, name in pages %}
       <li class="nav-item{% if id == active_page %} active{% endif %}">
-        <a class="nav-link" href="{{ url_for(id) }}">Diagnostics{% if id == active_page %}<span class="sr-only"> (current)</span>{% endif %}</a>
+        <a class="nav-link" href="{{ url_for(id) }}">{{ name }}{% if id == active_page %}<span class="sr-only"> (current)</span>{% endif %}</a>
       </li>
     {% endfor %}
     </ul>
     <ul class="navbar-nav px-3">
       <li class="nav-item">
-        <a class="nav-link white-icon" href="{{ url_for('auth.changepw') }}" title="Change password">{{ octicon('key') }}</a>
+        <a class="nav-link white-icon" href="{{ url_for('auth.changepw') }}" title="Change password">{{ icon('key') }}</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link white-icon" href="{{ url_for('auth.logout') }}" title="Log out">{{ octicon('sign-out') }}</a>
+        <a class="nav-link white-icon" href="{{ url_for('auth.logout') }}" title="Log out">{{ icon('sign-out') }}</a>
       </li>
     </ul>
   </nav>
@@ -43,7 +44,7 @@
   <footer class="footer">
     <div class="container">
       <span class="text-muted">
-        Made with 👁️👁️ and 🥚. Copyright © 2018 Milkey Mouse.
+        Basket {{ version|default(0.1) }} running on <code>{{ gethostname() }}</code>. Made with 👁️👁️ and 🥚. Copyright © 2018 Milkey Mouse.
       </span>
     </div>
   </footer>

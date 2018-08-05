@@ -1,5 +1,5 @@
 {% extends "/base.html" %}
-{% set active_page = "index" %}
+{% set active_page = "ctrl.index" %}
 {% block head %}
   <style>
     .form-group {list-style-type: none}
@@ -7,7 +7,7 @@
     .form-group input[type="checkbox"] + .btn-group > label span {width: 20px}
   </style>
 {% endblock %}
-{% block icon %}{{ octicon('tasklist') }}{% endblock %}
+{% block icon %}{{ icon('tasklist') }}{% endblock %}
 {% block content %}
     <ul class="form-group">
       {% for name, ready in checklist %}
@@ -15,7 +15,7 @@
         <input type="checkbox" name="{{ name.lower() }}" disabled>
         <div class="btn-group">
           <label for="{{ name.lower() }}" class="btn btn-{{ 'success' if ready else 'danger' }}">
-            <span class="white-icon">{{ octicon('check' if ready else 'x') }}</span>
+            <span class="white-icon">{{ icon('check' if ready else 'x') }}</span>
           </label>
           <label for="{{ name.lower() }}" class="btn btn-outline-{{ 'success' if ready else 'danger' }}">{{ name }}</label>
         </div>
