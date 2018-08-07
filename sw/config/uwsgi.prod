@@ -1,0 +1,17 @@
+[uwsgi]
+logto = /var/log/basket/uwsgi.log
+
+vhost = true
+socket = /tmp/basket/serve.sock
+py-tracebacker = /tmp/basket/traceback.sock
+
+virtualenv = /var/www/basket/venv
+chdir = /var/www/basket
+callable = basket.run:app
+mule = basket.worker:run_worker
+
+enable-threads = true
+processes = 4
+master = true
+harakiri = 30
+

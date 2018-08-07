@@ -1,0 +1,19 @@
+server {
+    listen             80;
+    server_name        $hostname.local;
+    access_log         /var/log/basket/access.log;
+    error_log          /var/log/basket/error.log;
+
+    location / {
+        try_files $uri @flask;
+    }
+
+    location /static {
+        alias /var/www/basket/static;
+    }
+
+    location @flask {
+        include        uwsgi_params;
+        uwsgi_pass     unix:/tmp/basket/serve.sock;
+    }
+}

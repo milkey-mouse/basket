@@ -1,0 +1,9 @@
+[uwsgi]
+callable = basket.run:app
+mule = basket.worker:run_worker
+
+enable-threads = true
+processes = 4
+master = true
+harakiri = 30
+

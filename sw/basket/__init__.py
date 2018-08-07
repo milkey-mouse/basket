@@ -11,6 +11,7 @@ def create_app():
         SECRET_KEY=("dev" if app.debug else os.urandom(32)),
         DATABASE=os.path.join(app.instance_path, "basket.sqlite"),
         COMMAND_PREFIX=[],
+        PROPAGATE_EXCEPTIONS=True
     )
     app.config.from_pyfile("config.py", silent=True)
 
