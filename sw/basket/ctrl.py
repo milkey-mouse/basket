@@ -1,5 +1,4 @@
 from socket import gethostname, gethostbyname
-from operator import itemgetter
 from flask import Blueprint, render_template, redirect, url_for
 from .utils import ip_addresses, get_temp, get_ble_addr, get_bluez_version
 from .auth import login_required
@@ -35,5 +34,6 @@ def bt():
 @bp.route("/bluetooth")
 @login_required
 def bluetooth():
-    devices = get_db().execute("SELECT * FROM bluetooth WHERE hostdev = 0")
+    devices = get_db().execute("SELECT * FROM bluetooth WHERE hostdev = 0").fetchall()
+    devices.sort(key=lambda x: x["rssi"] if x["rssi"] is not None else float("-inf"), reverse=True)
     return render_template("ctrl/bluetooth.html", devices=devices)

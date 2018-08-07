@@ -22,12 +22,13 @@ def get_dummy_mac():
 def dummy_worker():
     db = get_db()
 
-    db.execute("INSERT INTO bluetooth VALUES(?, Test, 1)", (get_dummy_mac(),))
+    db.execute("DELETE FROM bluetooth")
+    db.execute("INSERT INTO bluetooth VALUES(?, Test, NULL, 1)", (get_dummy_mac(),))
     db.commit()
 
     for i in range(0, 10):
         time.sleep(3)
-        db.execute("INSERT INTO bluetooth VALUES(?, ?, 0)",
+        db.execute("INSERT INTO bluetooth VALUES(?, ?, NULL, 0)",
                    (get_dummy_mac(), random.choice(("Egg", None))))
         db.commit()
 
@@ -41,9 +42,11 @@ def run_dummy_worker():
 
 def worker():
     db = get_db()
+    db.execute("DELETE FROM bluetooth")
+    db.commit()
 
     cmd = current_app.config["COMMAND_PREFIX"] + ["bluetoothctl"]
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=sys.stderr, stdin=subprocess.PIPE, bufsize=0)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=sys.stderr, stdin=subprocess.PIPE, bufsize=0, start_new_session=True)
     fl = fcntl.fcntl(p.stdout, fcntl.F_GETFL)
     fcntl.fcntl(p.stdout, fcntl.F_SETFL, fl | os.O_NONBLOCK)
 
@@ -58,7 +61,7 @@ def worker():
                 if chunk is None or len(chunk) == 0:
                     if timeout is not None:
                         timer += 1
-                        if timer >= timeout:
+                        if timer > timeout:
                             raise subprocess.TimeoutExpired(cmd, timeout)
                     time.sleep(1)
                     continue
@@ -81,7 +84,7 @@ def worker():
                     expect.data = expect.data[idx+1:]
                     if line == sentinel:
                         return
-                    elif line == "":
+                    elif line.strip() == "":
                         continue
 
                     for callback in callbacks:
@@ -109,9 +112,38 @@ def worker():
             return
         if evt == "[NEW]":
             print("adding controller", macaddr)
-            db.execute("REPLACE INTO bluetooth VALUES(?, ?, 1)", (macaddr, name))
+            if len(extra) > 0:
+                name += " " + " ".join(extra)
+                if name.endswith(" (default)"):
+                    name = name[:-len(" (default)")]
+            db.execute("REPLACE INTO bluetooth VALUES(?, ?, NULL, 1)", (macaddr, name))
         elif evt == "[DEL]":
             print("deleting controller", macaddr)
+            db.execute("DELETE FROM bluetooth WHERE macaddr = ?", (macaddr,))
+        else:
+            return
+        db.commit()
+
+    def update_devices(line):
+        try:
+            evt, type, macaddr, *extra = line.split(" ")
+            if type != "Device": raise ValueError
+        except ValueError:
+            return
+        if evt == "[NEW]":
+            name = " ".join(extra) if len(extra) > 0 else None
+            print("adding device", macaddr)
+            db.execute("REPLACE INTO bluetooth VALUES(?, ?, NULL, 0)", (macaddr, name))
+        elif evt == "[CHG]" and len(extra) > 0 and extra[0] == "Name:":
+            name = " ".join(extra[1:])
+            print("updating device", macaddr, "name to", name)
+            db.execute("UPDATE bluetooth SET name = ? WHERE macaddr = ?", (name, macaddr))
+        elif evt == "[CHG]" and len(extra) == 2 and extra[0] == "RSSI:":
+            rssi = int(extra[1])
+            print("updating device", macaddr, "RSSI to", rssi)
+            db.execute("UPDATE bluetooth SET rssi = ? WHERE macaddr = ?", (rssi, macaddr))
+        elif evt == "[DEL]":
+            print("deleting device", macaddr)
             db.execute("DELETE FROM bluetooth WHERE macaddr = ?", (macaddr,))
         else:
             return
@@ -126,14 +158,25 @@ def worker():
 
     stdin = TextIOWrapper(p.stdin, "utf-8", write_through=True)
     try:
-        expect("[bluetooth]# ", update_controllers)
+        expect("[bluetooth]# ", print, update_controllers, update_devices)
         print("version", file=stdin)
-        expect("[bluetooth]# ", update_controllers, update_version)
+        expect("[bluetooth]# ", print, update_controllers, update_devices, update_version)
+        print("power on", file=stdin)
+        expect("[bluetooth]# ", print, update_controllers, update_devices, update_version)
+        print("scan on", file=stdin)
+        try:
+            expect(None, print, update_controllers, update_devices, update_version)
+        except KeyboardInterrupt:
+            print("scan off", file=stdin)
+            expect("[bluetooth]# ", timeout=1)
+            print("power off", file=stdin)
+            expect("[bluetooth]# ", timeout=1)
     finally:
         if p.poll() is None:
+            print("cleaning up")
             print("exit", file=stdin)
             try:
-                expect(None, update_controllers, timeout=3)
+                expect(None, update_controllers, update_devices, timeout=3)
             except subprocess.TimeoutExpired:
                 p.kill()
 
