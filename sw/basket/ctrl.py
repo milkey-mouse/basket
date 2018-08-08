@@ -42,11 +42,3 @@ def bluetooth():
     devices = get_db().execute("SELECT * FROM bluetooth WHERE hostdev = 0").fetchall()
     devices.sort(key=lambda x: x["rssi"] if x["rssi"] is not None else float("-inf"), reverse=True)
     return render_template("ctrl/bluetooth.html", devices=devices)
-
-
-if has_uwsgi:
-    @bp.route("/debug/reload")
-    @login_required
-    def reload_server():
-        uwsgi.reload()
-        return redirect(url_for("index"))

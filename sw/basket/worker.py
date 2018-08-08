@@ -1,3 +1,4 @@
+from traceback import print_exc
 from time import sleep
 import sqlite3
 import atexit
@@ -12,6 +13,7 @@ has_bluetooth = True
 try:
     import Adafruit_BluefruitLE as able
     from Adafruit_BluefruitLE.services import UART
+    from dbus.exceptions import DBusException
 except ImportError:
     has_bluetooth = False
 
@@ -53,6 +55,9 @@ def dummy_worker():
             db.execute("INSERT INTO bluetooth VALUES(?, ?, NULL, 0)",
                        (get_dummy_mac(), random.choice(("Egg", None))))
             db.commit()
+
+        while True:
+            sleep(1)
     finally:
         try:
             db.execute("DELETE FROM bluetooth WHERE hostDev = 1")
@@ -84,7 +89,10 @@ def worker():
         db.execute("DELETE FROM bluetooth")
         db.commit()
 
-        ble.clear_cached_data()
+        try:
+            ble.clear_cached_data()
+        except DBusException:
+            pass
         adapters = ble.list_adapters()
 
         if len(adapters) == 0:
@@ -136,7 +144,12 @@ def worker():
 
 
 def run_worker():
-    import traceback
+    if not has_bluetooth:
+        print("Bluefruit LE library is not installed; Bluetooth worker cannot run.")
+        if has_uwsgi:
+            while True:
+                sleep(1)
+        return
     print("Worker running.")
     worker.db_path = create_app().config["DATABASE"]
     if has_uwsgi:
@@ -145,8 +158,8 @@ def run_worker():
     try:
         ble.initialize()
         ble.run_mainloop_with(worker)
-    except:
-        traceback.print_exc()
+    except Exception:
+        print_exc()  # because uWSGI/Flask won't do it for us...
     finally:
         if has_uwsgi:
             uwsgi.mule_msg(b"exit", uwsgi.mule_id())

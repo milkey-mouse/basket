@@ -10,8 +10,7 @@ def create_app():
         # the secret key doesn't need to persist; the user can just relogin
         SECRET_KEY=("dev" if app.debug else os.urandom(32)),
         DATABASE=os.path.join(app.instance_path, "basket.sqlite"),
-        COMMAND_PREFIX=[],
-        PROPAGATE_EXCEPTIONS=True
+        COMMAND_PREFIX=[]
     )
     app.config.from_pyfile("config.py", silent=True)
 
