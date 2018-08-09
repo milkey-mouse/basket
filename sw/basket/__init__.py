@@ -3,6 +3,15 @@ from socket import gethostname
 from werkzeug.security import generate_password_hash
 from flask import Flask, session, redirect, url_for
 
+has_uwsgi = True
+try:
+    import uwsgi
+except ImportError:
+    has_uwsgi = False
+
+if has_uwsgi:
+    from flask_uwsgi_websocket import WebSocket
+
 
 def create_app():
     app = Flask(__name__)
@@ -30,5 +39,9 @@ def create_app():
     app.register_blueprint(ctrl.bp)
 
     app.add_url_rule("/", endpoint="index")
+
+    if has_uwsgi:
+        app.ws = WebSocket(app)
+        app.ws.register_blueprint(ctrl.ws)
 
     return app

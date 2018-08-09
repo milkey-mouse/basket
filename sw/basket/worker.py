@@ -49,12 +49,17 @@ def dummy_worker():
         db.execute("INSERT INTO bluetooth VALUES(?, ?, NULL, 1)",
             (get_dummy_mac(), "Dummy Adapter"))
         db.commit()
+        if has_uwsgi:
+            uwsgi.signal(1)
+
 
         for i in range(0, 10):
             sleep(3)
             db.execute("INSERT INTO bluetooth VALUES(?, ?, NULL, 0)",
                        (get_dummy_mac(), random.choice(("Egg", None))))
             db.commit()
+            if has_uwsgi:
+                uwsgi.signal(1)
 
         while True:
             sleep(1)
@@ -88,6 +93,8 @@ def worker():
     try:
         db.execute("DELETE FROM bluetooth")
         db.commit()
+        if has_uwsgi:
+            uwsgi.signal(1)
 
         try:
             ble.clear_cached_data()
@@ -127,6 +134,7 @@ def worker():
                     (device.id, device.name, device.rssi))
             db.commit()
             if has_uwsgi:
+                uwsgi.signal(1)
                 try:
                     for msg in iter(q.get_nowait, None):
                         if msg[0] == "soft-restart":

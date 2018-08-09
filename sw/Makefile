@@ -1,10 +1,10 @@
 .PHONY: run db cert clean
 
 run: instance
-	venv/bin/uwsgi --socket 0.0.0.0:5000 --protocol=http -w basket.run:app --processes 4 --threads 2 \
+	venv/bin/uwsgi --master --http 0.0.0.0:5000 --http-websockets --wsgi basket.run:app --processes 4 --threads 2 \
 	--mule=basket.worker:$(shell (command -v bluetoothctl > /dev/null && echo run_worker) || echo run_dummy_worker)
 
-instance:
+instance: venv
 	mkdir -p instance
         ifeq (,$(wildcard instance/basket.sqlite))
 		FLASK_APP=basket venv/bin/flask init-db
@@ -20,4 +20,4 @@ cert: instance
 	openssl req -x509 -nodes -sha256 -days 365 -newkey rsa:4096 -keyout instance/self-signed.key -out instance/self-signed.crt -subj "/CN=`hostname`"
 
 clean:
-	rm -r venv instance
+	rm -rf venv instance
