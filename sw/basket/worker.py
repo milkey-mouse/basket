@@ -115,6 +115,23 @@ def worker():
             (adapter.macaddr, adapter.name))
         db.commit()
 
+        # TODO: upstream this
+        def prop_suppress(prop):
+            old = prop.fget
+            def new(self):
+                try:
+                    return old(self)
+                except DBusException as e:
+                    if e.get_dbus_name() != "org.freedesktop.DBus.Error.InvalidArgs":
+                        raise
+                return None
+            return prop.getter(new)
+
+
+        bzd = able.bluez_dbus.device.BluezDevice
+        bzd.name = prop_suppress(bzd.name)
+        bzd.rssi = prop_suppress(bzd.rssi)
+
         # make the name of the device significant (we want to notice the difference
         # so we can update the database)
         able.interfaces.Device.__hash__ = lambda self: hash((self.id, self.name, self.rssi))
