@@ -16,13 +16,13 @@
 {% block content %}
     <div id="radio-tower" hidden>{{ icon('radio-tower') }}</div>
     <div id="ws-connected" class="alert alert-success alert-dismissible" role="alert" hidden>
-      WebSocket is connected. This page will automatically update.
+      <p>WebSocket is connected. This page will automatically update.</p>
       <button type="button" class="close" data-dismiss="alert" aria-label="Close">
         <span aria-hidden="true">&times;</span>
       </button>
     </div>
     <div id="ws-error" class="alert alert-danger alert-dismissible" role="alert" hidden>
-      The WebSocket closed unexpectedly. This page will not automatically update.
+      <p>The WebSocket closed unexpectedly. This page will not automatically update.</p>
       <button type="button" class="close" data-dismiss="alert" aria-label="Close">
         <span aria-hidden="true">&times;</span>
       </button>
@@ -111,14 +111,21 @@ socket.addEventListener("open", function(evt) {
 });
 
 socket.addEventListener("close", function(evt) {
-    document.getElementById("ws-connected").setAttribute("hidden", true);
-    document.getElementById("ws-error").removeAttribute("hidden");
+    if (event.code === 1000) {
+        // socket was closed normally, try to reconnect
+        socket.open();
+    } else {
+        document.getElementById("ws-connected").setAttribute("hidden", true);
+        let err = document.getElementById("ws-error");
+        err.getElementsByTagName("p")[0].innerText = "The WebSocket closed unexpectedly: " + evt.reason + " (Code " + evt.code + "). This page will not automatically update.";
+        err.removeAttribute("hidden");
+    }
 });
 
 socket.addEventListener("error", function(evt) {
     document.getElementById("ws-connected").setAttribute("hidden", true);
     let err = document.getElementById("ws-error");
-    err.innerText = "There was an error with the WebSocket: " + evt + " This page will not automatically update.";
+    err.getElementsByTagName("p")[0].innerText = "There was an error with the WebSocket: " + evt + ". This page will not automatically update.";
     err.removeAttribute("hidden");
 });
 
@@ -128,6 +135,8 @@ Array.prototype.forEach.call(document.getElementsByClassName("alert"), function(
     });
 });
 
-document.getElementById("ws-connected").removeAttribute("hidden");
+if (socket.readyState === WebSocket.OPEN) {
+    document.getElementById("ws-connected").removeAttribute("hidden");
+}
 </script>
 {% endblock %}
