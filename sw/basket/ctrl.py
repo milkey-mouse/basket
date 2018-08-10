@@ -50,6 +50,13 @@ def bluetooth():
 
 if has_uwsgi:
 
+    @bp.route("/bluetooth/restart")
+    @login_required
+    def bluetooth_restart():
+        uwsgi.mule_msg(b"bt restart")
+        return redirect(url_for(".bluetooth"))
+
+
     def init_ws(app):
         bt_changed = Event()
         uwsgi.register_signal(1, "workers", lambda x: bt_changed.set())

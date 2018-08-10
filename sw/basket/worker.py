@@ -59,9 +59,22 @@ def dummy_worker():
             db.commit()
             if has_uwsgi:
                 uwsgi.signal(1)
-
+                try:
+                    for msg in iter(q.get_nowait, None):
+                        if msg[0] == "restart":
+                            return
+                except queue.Empty:
+                    pass
         while True:
             sleep(1)
+            if has_uwsgi:
+                try:
+                    for msg in iter(q.get_nowait, None):
+                        if msg[0] == "restart":
+                            return
+                except queue.Empty:
+                    pass
+
     finally:
         try:
             db.execute("DELETE FROM bluetooth WHERE hostDev = 1")
@@ -71,15 +84,11 @@ def dummy_worker():
         db.close()
 
 
-def run_dummy_worker():
-    print("Dummy worker running.")
-    dummy_worker.db_path = create_base().config["DATABASE"]
-    dummy_worker()
-
-
 def push_mule_events():
     for msg in iter(uwsgi.mule_get_msg, b"exit"):
-        q.put(msg.decode().split())
+        target, *m = msg.decode().split()
+        if target == "bt":
+            q.put(m)
 
 
 def worker():
@@ -153,8 +162,8 @@ def worker():
                 uwsgi.signal(1)
                 try:
                     for msg in iter(q.get_nowait, None):
-                        if msg[0] == "soft-restart":
-                            worker()
+                        if msg[0] == "restart":
+                            return
                 except queue.Empty:
                     pass
             sleep(1)
@@ -165,6 +174,22 @@ def worker():
         except:
             pass
         db.close()
+
+
+def run_dummy_worker():
+    print("Dummy worker running.")
+    dummy_worker.db_path = create_base().config["DATABASE"]
+    if has_uwsgi:
+        t = Thread(target=push_mule_events)
+        t.start()
+    try:
+        dummy_worker()
+    except Exception:
+        print_exc()  # because uWSGI/Flask won't do it for us...
+    finally:
+        if has_uwsgi:
+            uwsgi.mule_msg(b"exit", uwsgi.mule_id())
+            t.join()
 
 
 def run_worker():
@@ -183,7 +208,7 @@ def run_worker():
         ble.initialize()
         ble.run_mainloop_with(worker)
     except Exception:
-        print_exc()  # because uWSGI/Flask won't do it for us...
+        print_exc()
     finally:
         if has_uwsgi:
             uwsgi.mule_msg(b"exit", uwsgi.mule_id())

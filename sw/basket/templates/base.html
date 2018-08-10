@@ -37,7 +37,7 @@
     </ul>
   </nav>
   <main role="main" class="container">
-    <h1>{% block icon %}{% endblock %} {{ page_name }}</h1>
+    {% block title %}<h1>{% block icon %}{% endblock %} {{ page_name }}</h1>{% endblock %}
     {% block content %}
     {% endblock %}
   </main>
