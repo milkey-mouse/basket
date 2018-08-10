@@ -7,7 +7,7 @@ run: capture_plugin.so instance
 
 capture_plugin.so: venv
 	rm -rf uwsgi-capture
-	curl -L https://api.github.com/repos/unbit/uwsgi-capture/tarball/master | tar -zx
+	curl -L https://api.github.com/repos/milkey-mouse/uwsgi-capture/tarball/master | tar -zx
 	mv *-uwsgi-capture-* uwsgi-capture
 	venv/bin/uwsgi --build-plugin uwsgi-capture
 
