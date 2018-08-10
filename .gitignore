@@ -111,3 +111,6 @@ instance/
 docs/_build/
 venv/
 config.py
+
+.uwsgi_plugins_builder/
+sw/uwsgi-capture/

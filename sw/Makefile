@@ -1,8 +1,15 @@
 .PHONY: run db cert clean
 
-run: instance
+run: capture_plugin.so instance
 	venv/bin/uwsgi --master --http 0.0.0.0:5000 --http-websockets --wsgi basket.run:app --processes 4 --threads 2 \
-	--mule=basket.worker:$(shell (command -v bluetoothctl > /dev/null && echo run_worker) || echo run_dummy_worker)
+	--mule=basket.worker:$(shell (command -v bluetoothctl > /dev/null && echo run_worker) || echo run_dummy_worker) \
+	$(shell [ -e /dev/video0 ] && echo --plugin capture --v4l-capture /dev/video0 --mule=captureloop\\\(\\\) || true)
+
+capture_plugin.so: venv
+	rm -rf uwsgi-capture
+	curl -L https://api.github.com/repos/unbit/uwsgi-capture/tarball/master | tar -zx
+	mv *-uwsgi-capture-* uwsgi-capture
+	venv/bin/uwsgi --build-plugin uwsgi-capture
 
 instance: venv
 	mkdir -p instance
@@ -20,4 +27,4 @@ cert: instance
 	openssl req -x509 -nodes -sha256 -days 365 -newkey rsa:4096 -keyout instance/self-signed.key -out instance/self-signed.crt -subj "/CN=`hostname`"
 
 clean:
-	rm -rf venv instance
+	rm -rf venv instance uwsgi-capture capture_plugin.so
