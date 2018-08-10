@@ -21,7 +21,7 @@ ws = Blueprint("wsCtrl", __name__)
 @login_required
 def index():
     checklist = {
-        "Bluetooth": ping_worker(),
+        "ctrl.bluetooth": ping_worker(),
         "Calibration": True,
         "Camera": False,
         "Streamer": True,

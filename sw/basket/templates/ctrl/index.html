@@ -13,13 +13,13 @@
       <div class="col-auto">
         <h3>{{ icon('graph') }} Status</h3>
         <ul class="list-unstyled form-group">
-          {% for name, ready in checklist %}
+          {% for page, ready in checklist %}
           <li>
             <div class="btn-group">
               <div class="btn btn-{{ 'success' if ready else 'danger' }}">
                 <span class="white-icon">{{ icon('check' if ready else 'x') }}</span>
               </div>
-              <div class="btn btn-block btn-outline-{{ 'success' if ready else 'danger' }}">{{ name }}</div>
+              <a class="btn btn-block btn-outline-{{ 'success' if ready else 'danger' }}" href="{% if page in dict(pages) %}{{ url_for(page) }}">{{ dict(pages)[page] }}{% else %}#">{{ page }}{% endif %}</a>
             </div>
           </li>
           {% endfor %}
