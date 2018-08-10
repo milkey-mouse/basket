@@ -1,4 +1,6 @@
 from traceback import print_exc
+from functools import partial
+from itertools import chain
 from time import sleep
 import sqlite3
 import atexit
@@ -6,6 +8,7 @@ import random
 import sys
 import os
 from click import command
+from .utils import queue_timeout_iter
 from . import create_base
 
 has_bluetooth = True
@@ -53,28 +56,34 @@ def dummy_worker():
 
 
         for i in range(0, 10):
-            sleep(3)
             db.execute("INSERT INTO bluetooth VALUES(?, ?, ?, 0)",
                        (get_dummy_mac(), random.choice(("Egg", None)), random.randint(-128, 0)))
             db.commit()
+            wait = 1 + random.random() * 2
             if has_uwsgi:
                 uwsgi.signal(1)
                 try:
-                    for msg in iter(q.get_nowait, None):
+                    for msg in queue_timeout_iter(q, wait):
                         if msg[0] == "restart":
                             return
+                        elif msg[0] == "ping":
+                            uwsgi.signal(3)  # pong
                 except queue.Empty:
                     pass
+            else:
+                sleep(wait)
         while True:
-            sleep(1)
             if has_uwsgi:
                 try:
-                    for msg in iter(q.get_nowait, None):
+                    for msg in iter(q.get, None):
                         if msg[0] == "restart":
                             return
+                        elif msg[0] == "ping":
+                            uwsgi.signal(3)  # pong
                 except queue.Empty:
                     pass
-
+            else:
+                sleep(1)
     finally:
         try:
             db.execute("DELETE FROM bluetooth WHERE hostDev = 1")
@@ -161,12 +170,15 @@ def worker():
             if has_uwsgi:
                 uwsgi.signal(1)
                 try:
-                    for msg in iter(q.get_nowait, None):
+                    for msg in queue_timeout_iter(q, 1):
                         if msg[0] == "restart":
                             return
+                        elif msg[0] == "ping":
+                            uwsgi.signal(3)  # pong
                 except queue.Empty:
                     pass
-            sleep(1)
+            else:
+                sleep(1)
     finally:
         try:
             db.execute("DELETE FROM bluetooth WHERE hostDev = 1")
@@ -183,7 +195,10 @@ def run_dummy_worker():
         t = Thread(target=push_mule_events)
         t.start()
     try:
-        dummy_worker()
+        while True:
+            dummy_worker()
+            if has_uwsgi:
+                break
     except Exception:
         print_exc()  # because uWSGI/Flask won't do it for us...
     finally:
@@ -206,7 +221,10 @@ def run_worker():
         t.start()
     try:
         ble.initialize()
-        ble.run_mainloop_with(worker)
+        while True:
+            ble.run_mainloop_with(worker)
+            if has_uwsgi:
+                break
     except Exception:
         print_exc()
     finally:

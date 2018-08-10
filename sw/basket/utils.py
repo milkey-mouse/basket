@@ -1,10 +1,20 @@
 from operator import itemgetter
+from threading import Event
+from time import monotonic
+from queue import Empty
 import subprocess
 import netifaces
+import os
 from urllib.parse import urlparse, urlunparse
 from werkzeug.urls import url_decode, url_encode
 from flask import current_app
 from .db import get_db
+
+has_uwsgi = True
+try:
+    import uwsgi
+except ImportError:
+    has_uwsgi = False
 
 
 def with_query_string(url, key, value):
@@ -31,7 +41,7 @@ def get_temp():
     try:
         try:
             # try to use the Broadcom proprietary cmd for rpi
-            p = subprocess.run(current_app.config["COMMAND_PREFIX"] + ["vcgencmd", "measure_temp"], stdout=subprocess.PIPE, check=True)
+            p = subprocess.run(["vcgencmd", "measure_temp"], stdout=subprocess.PIPE, check=True)
             temp = float(p.stdout.decode("utf-8").split("=")[1].split("'")[0])
         except FileNotFoundError:
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
@@ -48,6 +58,43 @@ def get_ble_addr():
         return ", ".join(map(itemgetter("macaddr"), qr))
     else:
         return "Unknown"
+
+
+if has_uwsgi:
+    pong = Event()
+    uwsgi.register_signal(3, "workers", lambda x: pong.set())
+
+    def ping_worker():
+        pong.clear()
+        uwsgi.mule_msg(b"bt ping", 1)
+        return pong.wait(3)
+else:
+    def ping_worker():
+        for pid in filter(lambda x: x.isdigit(), os.listdir("/proc")):
+            try:
+                with open(os.path.join("/proc", pid, "cmdline"), "rb") as cmdline:
+                    args = [x.decode() for x in cmdline.read().split(b"\x00")][:-1]
+                    if (len(args) == 2 and os.path.basename(args[0]) == "flask" and args[1] in ("run-worker", "run-dummy-worker")) or \
+                        (len(args) == 3 and os.path.basename(args[1]) == "flask" and args[2] in ("run-worker", "run-dummy-worker")):
+                        return True
+            except IOError:
+                continue
+        return False
+
+
+def queue_timeout_iter(q, timeout):
+    end = monotonic() + timeout
+    while True:
+        timeout = max(0, end - monotonic())
+        try:
+            item = q.get(block=False, timeout=timeout)
+            if item is not None:
+                yield item
+            elif timeout == 0:
+                break
+        except Empty:
+            if timeout == 0:
+                break
 
 
 class hashabledict(dict):

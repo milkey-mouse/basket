@@ -3,7 +3,7 @@ from threading import Event
 from time import sleep
 import json
 from flask import Blueprint, render_template, redirect, request, url_for, session
-from .utils import ip_addresses, get_temp, get_ble_addr, hashabledict, with_query_string
+from .utils import ip_addresses, get_temp, get_ble_addr, hashabledict, with_query_string, ping_worker
 from .auth import login_required
 from .db import get_db
 
@@ -20,19 +20,19 @@ ws = Blueprint("wsCtrl", __name__)
 @bp.route("/")
 @login_required
 def index():
-    checklist = [
-        ("Bluetooth", True),
-        ("Camera", False),
-        ("Streamer", True),
-        ("Calibration", True)
-    ]
-    sysinfo = [
-        ("Hostname", gethostname()),
-        ("IP address", ip_addresses()),
-        ("Host Bluetooth address", get_ble_addr()),
-        ("CPU temp", get_temp()),
-    ]
-    return render_template("ctrl/index.html", checklist=checklist, sysinfo=sysinfo)
+    checklist = {
+        "Bluetooth": ping_worker(),
+        "Calibration": True,
+        "Camera": False,
+        "Streamer": True,
+    }
+    sysinfo = {
+        "CPU temp": get_temp(),
+        "Host Bluetooth address": get_ble_addr(),
+        "Hostname": gethostname(),
+        "IP address": ip_addresses(),
+    }
+    return render_template("ctrl/index.html", checklist=sorted(checklist.items()), sysinfo=sorted(sysinfo.items()))
 
 
 @bp.route("/bt")
@@ -52,7 +52,7 @@ def bluetooth():
 @login_required
 def bluetooth_restart():
     if has_uwsgi:
-        uwsgi.mule_msg(b"bt restart")
+        uwsgi.mule_msg(b"bt restart", 1)
     return redirect(url_for(".bluetooth"))
 
 
