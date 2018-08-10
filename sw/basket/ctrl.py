@@ -48,14 +48,15 @@ def bluetooth():
     return render_template("ctrl/bluetooth.html", devices=devices)
 
 
-if has_uwsgi:
-
-    @bp.route("/bluetooth/restart")
-    @login_required
-    def bluetooth_restart():
+@bp.route("/bluetooth/restart")
+@login_required
+def bluetooth_restart():
+    if has_uwsgi:
         uwsgi.mule_msg(b"bt restart")
-        return redirect(url_for(".bluetooth"))
+    return redirect(url_for(".bluetooth"))
 
+
+if has_uwsgi:
 
     def init_ws(app):
         bt_changed = Event()
