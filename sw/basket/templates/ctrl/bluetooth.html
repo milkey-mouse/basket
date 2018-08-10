@@ -5,6 +5,7 @@
   <style>.form-group {list-style-type: none}</style>
 {% endblock %}
 {% block content %}
+    <div id="radio-tower" hidden>{{ icon('radio-tower') }}</div>
     <div id="ws-connected" class="alert alert-success alert-dismissible" role="alert" hidden>
         WebSocket is connected. This page will automatically update.
         <button type="button" class="close" data-dismiss="alert" aria-label="Close">
@@ -18,13 +19,13 @@
         </button>
     </div>
     <p>BLE devices in range of this Basket instance:</p>
-    <ul class="form-group">
+    <ul id="bt-devices" class="form-group">
       {% for device in devices %}
       {% set is_egg = device['name'] is not none and device['name'].lower().startswith('egg') -%}
       <li>
-        <span class="btn-group"{% if is_egg %} title="Potential egg"{% endif %}>
+        <span id="{{ device['macaddr']|replace(':','-') }}" class="btn-group bt-device"{% if is_egg %} title="Potential egg"{% endif %}>
           <label class="btn btn-outline-{{ 'primary' if is_egg else 'secondary' }}" title="RSSI: {{ device['rssi'] if device['rssi'] is not none else 'unknown' }}" disabled>{{ icon('radio-tower') }}</label>
-          <label class="btn btn-outline-{{ 'primary' if is_egg else 'secondary' }}"><samp>{{ device['macaddr'] }}{% if device['name'] is not none %}</samp> ({{ device['name'] }}){% endif %}</label>
+          <label class="btn btn-outline-{{ 'primary' if is_egg else 'secondary' }}"><samp>{{ device['macaddr'] }}</samp>{% if device['name'] is not none %} ({{ device['name'] }}){% endif %}</label>
         </span>
       </li>
       {% endfor %}
@@ -36,9 +37,55 @@ const proto = (location.protocol == "https:" ? "wss:" : "ws:") + "//";
 const socket = new WebSocket(proto + location.host + location.pathname + "/ws");
 
 socket.addEventListener("message", function (evt) {
-    if (event.data === "reload") {
-        location.reload(true);
+    let msg = JSON.parse(evt.data);
+
+    let elem = document.getElementById(msg.macaddr.replace(":", "-"));
+    if (elem !== null) {
+        elem.remove();
     }
+    
+    let newDev = document.createElement("li");
+    let span = document.createElement("span");
+    let icon = document.createElement("label");
+    let label = document.createElement("label");
+
+    span.setAttribute("id", msg.macaddr.replace(":", "-"));
+    span.classList.add("btn-group", "bt-device");
+    icon.classList.add("btn");
+    label.classList.add("btn");
+    if (msg.name !== null && msg.name.toLowerCase().startsWith("egg")) {
+        span.setAttribute("title", "Potential egg");
+        icon.classList.add("btn-outline-primary");
+        label.classList.add("btn-outline-primary");
+    } else {
+        icon.classList.add("btn-outline-secondary");
+        label.classList.add("btn-outline-secondary");
+    }
+    icon.setAttribute("title", "RSSI: " + (msg.rssi === null ? "unknown" : msg.rssi));
+    icon.innerHTML = document.getElementById("radio-tower").innerHTML;
+    label.innerHTML = "<samp>" + msg.macaddr + "</samp>";
+    if (msg.name !== null) {
+        label.innerHTML += " (" + msg.name + ")";
+    }
+
+    span.appendChild(icon);
+    span.appendChild(label);
+    newDev.appendChild(span);
+
+    let devices = document.getElementsByClassName("bt-device");
+    if (msg.rssi !== null) {
+        // add element in the right place like insertion sort
+        for(var i = 0; i < devices.length; i++) {
+            let other = devices.item(i);
+            let otherRSSI = other.getElementsByTagName("label")[0].getAttribute("title").split(" ")[1];
+            if (otherRSSI === "unknown" || msg.rssi > Number(otherRSSI)) {
+                console.log("despacito");
+                document.getElementById("bt-devices").insertBefore(newDev, other.parentNode);
+                return;
+            }
+        }
+    }
+    document.getElementById("bt-devices").appendChild(newDev);
 });
 
 socket.addEventListener("open", function(evt) {

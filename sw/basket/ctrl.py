@@ -1,16 +1,11 @@
 from socket import gethostname, gethostbyname
 from threading import Event
 from time import sleep
-from flask import Blueprint, render_template, redirect, request, url_for
-from .utils import ip_addresses, get_temp, get_ble_addr
+import json
+from flask import Blueprint, render_template, redirect, request, url_for, current_app
+from .utils import ip_addresses, get_temp, get_ble_addr, hashabledict
 from .auth import login_required
 from .db import get_db
-
-has_uwsgi = True
-try:
-    import uwsgi
-except ImportError:
-    has_uwsgi = False
 
 bp = Blueprint("ctrl", __name__)
 ws = Blueprint("wsCtrl", __name__)
@@ -47,17 +42,26 @@ def bluetooth():
     return render_template("ctrl/bluetooth.html", devices=devices)
 
 
-if has_uwsgi:
+def init_ws(app):
+    import uwsgi
+
     bt_changed = Event()
     uwsgi.register_signal(1, "workers", lambda x: bt_changed.set())
 
     @ws.route("/bluetooth/ws")
     def bluetooth_ws(ws):
         bt_changed.clear()
-        try:
-            while not bt_changed.wait(1):
-                ws.recv_nb()
-            bt_changed.clear()
-            ws.send("reload")
-        except (SystemError, OSError):
-            pass
+        with app.request_context(ws.environ):
+            db = get_db()
+            try:
+                while True:
+                    old = set(map(hashabledict, db.execute("SELECT * FROM bluetooth").fetchall()))
+                    while not bt_changed.wait(1):
+                        ws.recv_nb()
+                    bt_changed.clear()
+                    new = set(map(hashabledict, db.execute("SELECT * FROM bluetooth").fetchall()))
+                    changed = new - old
+                    for device in changed:
+                        ws.send(json.dumps(device))
+            except (SystemError, OSError):
+                pass

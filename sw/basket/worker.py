@@ -5,9 +5,8 @@ import atexit
 import random
 import sys
 import os
-from flask.cli import with_appcontext
 from click import command
-from . import create_app
+from . import create_base
 
 has_bluetooth = True
 try:
@@ -55,8 +54,8 @@ def dummy_worker():
 
         for i in range(0, 10):
             sleep(3)
-            db.execute("INSERT INTO bluetooth VALUES(?, ?, NULL, 0)",
-                       (get_dummy_mac(), random.choice(("Egg", None))))
+            db.execute("INSERT INTO bluetooth VALUES(?, ?, ?, 0)",
+                       (get_dummy_mac(), random.choice(("Egg", None)), random.randint(-128, 0)))
             db.commit()
             if has_uwsgi:
                 uwsgi.signal(1)
@@ -74,7 +73,7 @@ def dummy_worker():
 
 def run_dummy_worker():
     print("Dummy worker running.")
-    dummy_worker.db_path = create_app().config["DATABASE"]
+    dummy_worker.db_path = create_base().config["DATABASE"]
     dummy_worker()
 
 
@@ -176,7 +175,7 @@ def run_worker():
                 sleep(1)
         return
     print("Worker running.")
-    worker.db_path = create_app().config["DATABASE"]
+    worker.db_path = create_base().config["DATABASE"]
     if has_uwsgi:
         t = Thread(target=push_mule_events)
         t.start()

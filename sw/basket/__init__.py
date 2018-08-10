@@ -13,7 +13,7 @@ if has_uwsgi:
     from flask_uwsgi_websocket import WebSocket
 
 
-def create_app():
+def create_base():
     app = Flask(__name__)
     app.config.from_mapping(
         # the secret key doesn't need to persist; the user can just relogin
@@ -22,6 +22,12 @@ def create_app():
         COMMAND_PREFIX=[]
     )
     app.config.from_pyfile("config.py", silent=True)
+
+    return app
+
+
+def create_app():
+    app = create_base()
 
     os.makedirs(app.instance_path, exist_ok=True)
 
@@ -41,7 +47,9 @@ def create_app():
     app.add_url_rule("/", endpoint="index")
 
     if has_uwsgi:
-        app.ws = WebSocket(app)
-        app.ws.register_blueprint(ctrl.ws)
+        ctrl.init_ws(app)
+        ws = WebSocket(app)
+        ws.register_blueprint(ctrl.ws)
+        ws.app = app
 
     return app
