@@ -39,53 +39,62 @@ const socket = new WebSocket(proto + location.host + location.pathname + "/ws");
 socket.addEventListener("message", function (evt) {
     let msg = JSON.parse(evt.data);
 
-    let elem = document.getElementById(msg.macaddr.replace(":", "-"));
-    if (elem !== null) {
-        elem.remove();
-    }
-    
-    let newDev = document.createElement("li");
-    let span = document.createElement("span");
-    let icon = document.createElement("label");
-    let label = document.createElement("label");
+    if (msg.action === "clear") {
+        let devices = document.getElementById("bt-devices");
+        while (devices.firstChild) {
+            devices.removeChild(devices.firstChild);
+        }
+    } else if (msg.action === "del") {
+        let elem = document.getElementById(msg.macaddr.replace(":", "-"));
+        if (elem !== null) {
+            elem.remove();
+        }
+    } else if (msg.action === "add") {
 
-    span.setAttribute("id", msg.macaddr.replace(":", "-"));
-    span.classList.add("btn-group", "bt-device");
-    icon.classList.add("btn");
-    label.classList.add("btn");
-    if (msg.name !== null && msg.name.toLowerCase().startsWith("egg")) {
-        span.setAttribute("title", "Potential egg");
-        icon.classList.add("btn-outline-primary");
-        label.classList.add("btn-outline-primary");
-    } else {
-        icon.classList.add("btn-outline-secondary");
-        label.classList.add("btn-outline-secondary");
-    }
-    icon.setAttribute("title", "RSSI: " + (msg.rssi === null ? "unknown" : msg.rssi));
-    icon.innerHTML = document.getElementById("radio-tower").innerHTML;
-    label.innerHTML = "<samp>" + msg.macaddr + "</samp>";
-    if (msg.name !== null) {
-        label.innerHTML += " (" + msg.name + ")";
-    }
+        let newDev = document.createElement("li");
+        let span = document.createElement("span");
+        let icon = document.createElement("label");
+        let label = document.createElement("label");
 
-    span.appendChild(icon);
-    span.appendChild(label);
-    newDev.appendChild(span);
+        span.setAttribute("id", msg.macaddr.replace(":", "-"));
+        span.classList.add("btn-group", "bt-device");
+        icon.classList.add("btn");
+        label.classList.add("btn");
+        if (msg.name !== null && msg.name.toLowerCase().startsWith("egg")) {
+            span.setAttribute("title", "Potential egg");
+            icon.classList.add("btn-outline-primary");
+            label.classList.add("btn-outline-primary");
+        } else {
+            icon.classList.add("btn-outline-secondary");
+            label.classList.add("btn-outline-secondary");
+        }
+        icon.setAttribute("title", "RSSI: " + (msg.rssi === null ? "unknown" : msg.rssi));
+        icon.innerHTML = document.getElementById("radio-tower").innerHTML;
+        label.innerHTML = "<samp>" + msg.macaddr + "</samp>";
+        if (msg.name !== null) {
+            label.innerHTML += " (" + msg.name + ")";
+        }
 
-    let devices = document.getElementsByClassName("bt-device");
-    if (msg.rssi !== null) {
-        // add element in the right place like insertion sort
-        for(var i = 0; i < devices.length; i++) {
-            let other = devices.item(i);
-            let otherRSSI = other.getElementsByTagName("label")[0].getAttribute("title").split(" ")[1];
-            if (otherRSSI === "unknown" || msg.rssi > Number(otherRSSI)) {
-                console.log("despacito");
-                document.getElementById("bt-devices").insertBefore(newDev, other.parentNode);
-                return;
+        span.appendChild(icon);
+        span.appendChild(label);
+        newDev.appendChild(span);
+
+        let devices = document.getElementsByClassName("bt-device");
+        if (msg.rssi !== null) {
+            // add element in the right place like insertion sort
+            for (var i = 0; i < devices.length; i++) {
+                let other = devices.item(i);
+                let otherRSSI = other.getElementsByTagName("label")[0].getAttribute("title").split(" ")[1];
+                if (otherRSSI === "unknown") {
+                    break;
+                } else if (msg.rssi > Number(otherRSSI)) {
+                    document.getElementById("bt-devices").insertBefore(newDev, other.parentNode);
+                    return;
+                }
             }
         }
+        document.getElementById("bt-devices").appendChild(newDev);
     }
-    document.getElementById("bt-devices").appendChild(newDev);
 });
 
 socket.addEventListener("open", function(evt) {

@@ -2,10 +2,16 @@ from socket import gethostname, gethostbyname
 from threading import Event
 from time import sleep
 import json
-from flask import Blueprint, render_template, redirect, request, url_for, current_app
-from .utils import ip_addresses, get_temp, get_ble_addr, hashabledict
+from flask import Blueprint, render_template, redirect, request, url_for, session
+from .utils import ip_addresses, get_temp, get_ble_addr, hashabledict, with_query_string
 from .auth import login_required
 from .db import get_db
+
+has_uwsgi = True
+try:
+    import uwsgi
+except ImportError:
+    has_uwsgi = False
 
 bp = Blueprint("ctrl", __name__)
 ws = Blueprint("wsCtrl", __name__)
@@ -42,26 +48,32 @@ def bluetooth():
     return render_template("ctrl/bluetooth.html", devices=devices)
 
 
-def init_ws(app):
-    import uwsgi
+if has_uwsgi:
 
-    bt_changed = Event()
-    uwsgi.register_signal(1, "workers", lambda x: bt_changed.set())
+    def init_ws(app):
+        bt_changed = Event()
+        uwsgi.register_signal(1, "workers", lambda x: bt_changed.set())
 
-    @ws.route("/bluetooth/ws")
-    def bluetooth_ws(ws):
-        bt_changed.clear()
-        with app.request_context(ws.environ):
-            db = get_db()
-            try:
-                while True:
-                    old = set(map(hashabledict, db.execute("SELECT * FROM bluetooth").fetchall()))
-                    while not bt_changed.wait(1):
-                        ws.recv_nb()
-                    bt_changed.clear()
-                    new = set(map(hashabledict, db.execute("SELECT * FROM bluetooth").fetchall()))
-                    changed = new - old
-                    for device in changed:
-                        ws.send(json.dumps(device))
-            except (SystemError, OSError):
-                pass
+        @ws.route("/bluetooth/ws")
+        def bluetooth_ws(ws):
+            with app.request_context(ws.environ):
+                if not session.get("logged_in"):
+                    return redirect(with_query_string(url_for('auth.login'), "next", request.url))
+                bt_changed.clear()
+                db = get_db()
+                try:
+                    while True:
+                        old = set(filter(lambda x: not x["hostdev"], map(hashabledict, db.execute("SELECT * FROM bluetooth").fetchall())))
+                        while not bt_changed.wait(1):
+                            ws.recv_nb()
+                        new = set(filter(lambda x: not x["hostdev"], map(hashabledict, db.execute("SELECT * FROM bluetooth").fetchall())))
+                        bt_changed.clear()
+                        if len(new) == 0:
+                            ws.send(json.dumps({"action": "clear"}))
+                        else:
+                            for device in old - new:
+                                ws.send(json.dumps(dict(**device, action="del")))
+                            for device in new - old:
+                                ws.send(json.dumps(dict(**device, action="add")))
+                except (SystemError, OSError):
+                    pass
