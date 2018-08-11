@@ -3,13 +3,13 @@
 run: capture_plugin.so instance
 	venv/bin/uwsgi --master --http 0.0.0.0:5000 --http-websockets --wsgi basket.run:app --processes 4 --threads 2 \
 	--mule=basket.worker:$(shell (command -v bluetoothctl > /dev/null && echo run_worker) || echo run_dummy_worker) \
-	$(shell [ -e /dev/video0 ] && echo --plugin capture --v4l-capture /dev/video0 --mule=captureloop\\\(\\\) || true)
+	$(shell [ -e /dev/video0 ] && echo --plugin capture --v4l-device /dev/video0 --mule=captureloop\\\(\\\) || true)
 
 capture_plugin.so: venv
 	rm -rf uwsgi-capture
 	curl -L https://api.github.com/repos/milkey-mouse/uwsgi-capture/tarball/master | tar -zx
 	mv *-uwsgi-capture-* uwsgi-capture
-	venv/bin/uwsgi --build-plugin uwsgi-capture
+	cd uwsgi-capture && ../venv/bin/uwsgi --build-plugin . && cp *.so ..
 
 instance: venv
 	mkdir -p instance
