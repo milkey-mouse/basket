@@ -39,9 +39,10 @@ def create_app():
     worker.init_app(app)
     db.init_app(app)
 
-    from . import auth, ctrl
+    from . import auth, ctrl, stream
     app.register_blueprint(auth.bp)
     app.register_blueprint(ctrl.bp)
+    app.register_blueprint(stream.bp)
 
     app.add_url_rule("/", endpoint="index")
 
