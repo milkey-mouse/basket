@@ -64,6 +64,10 @@ def bluetooth_restart():
         uwsgi.mule_msg(b"bt restart", 1)
     return redirect(url_for(".bluetooth"))
 
+@bp.route("/calibration")
+@login_required
+def calibration():
+    return render_template("ctrl/calibration.html", connected)
 
 @bp.route("/connect/<macaddr>")
 @login_required
