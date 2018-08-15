@@ -1,0 +1,25 @@
+{% extends "/base.html" %}
+{% set active_page = "ctrl.calibration" %}
+{% block head %}
+{% endblock %}
+{% block icon %}{{ icon('tasklist') }}{% endblock %}
+{% block content %}
+    <script src="Scripts/mousetracker.js"></script>
+        <br>
+            <h2>Please click on Egg #1.<h2>
+                <div>
+                    <div>
+                        <div>
+                            <a id="test">
+                                <img src="/static/webcam.png" alt="test image" width="640" height="480"/>
+                                <ul>
+				    {% for device in connected %}
+				    <li>{{ device }}</li>
+                                    {% endblock %}
+                                </ul>	
+                            </a>
+                        </div>
+                    </div>
+                </div>
+<br>
+{% endblock %}
