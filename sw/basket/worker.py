@@ -2,6 +2,7 @@ from traceback import print_exc
 from functools import partial
 from itertools import chain
 from time import sleep
+from uuid import UUID
 import sqlite3
 import atexit
 import random
@@ -10,6 +11,8 @@ import os
 from click import command
 from .utils import queue_timeout_iter
 from . import create_base
+
+#SERVO_SERVICE_UUID = UUID(""
 
 has_bluetooth = True
 try:
@@ -149,21 +152,13 @@ def worker():
         bzd.name = prop_suppress(bzd.name)
         bzd.rssi = prop_suppress(bzd.rssi)
 
-        # make the name of the device significant (we want to notice the difference
-        # so we can update the database)
-        able.interfaces.Device.__hash__ = lambda self: hash((self.id, self.name, self.rssi))
-
         adapter.power_on()
         adapter.start_scan()
         atexit.register(adapter.stop_scan)
         atexit.register(adapter.power_off)
 
-        known = set()
         while True:
-            #found = set(UART.find_devices())
-            found = set(ble.list_devices())
-            new = found - known
-            for device in new:
+            for device in ble.list_devices():
                 db.execute("REPLACE INTO bluetooth VALUES(?, ?, ?, 0)",
                     (device.id, device.name, device.rssi))
             db.commit()
