@@ -8,6 +8,9 @@
     #restart {
       margin-top: 5px;
     }
+    .no-underline {
+      text-decoration: none !important;
+    }
   </style>
 {% endblock %}
 {% block title %}
@@ -32,10 +35,12 @@
       {% for device in devices %}
       {% set is_egg = device['name'] is not none and device['name'].lower().startswith('egg') -%}
       <li>
-        <span id="{{ device['macaddr']|replace(':','-') }}" class="btn-group bt-device"{% if is_egg %} title="Potential egg"{% endif %}>
-          <label class="btn btn-outline-{{ 'primary' if is_egg else 'secondary' }}" title="RSSI: {{ device['rssi'] if device['rssi'] is not none else 'unknown' }}" disabled>{{ icon('radio-tower') }}</label>
-          <label class="btn btn-outline-{{ 'primary' if is_egg else 'secondary' }}"><samp>{{ device['macaddr'] }}</samp>{% if device['name'] is not none %} ({{ device['name'] }}){% endif %}</label>
+        {% if is_egg %}<a class="no-underline" href="{{ url_for('ctrl.disconnect' if device['connected'] else 'ctrl.connect', macaddr=device['macaddr']) }}">{% endif %}
+        <span id="{{ device['macaddr']|replace(':','-') }}" class="btn-group bt-device"{% if is_egg and not device['connected'] %} title="Potential egg"{% endif %}>
+          <label class="btn btn-outline-{{ 'success' if device['connected'] else ('primary' if is_egg else 'secondary') }}" title="RSSI: {{ device['rssi'] if device['rssi'] is not none else 'unknown' }}" disabled>{{ icon('radio-tower') }}</label>
+          <label class="btn btn-outline-{{ 'success' if device['connected'] else ('primary' if is_egg else 'secondary') }}"><samp>{{ device['macaddr'] }}</samp>{% if device['name'] is not none %} ({{ device['name'] }}){% endif %}</label>
         </span>
+        {% if is_egg %}</a>{% endif %}
       </li>
       {% endfor %}
     </ul>
@@ -69,7 +74,7 @@ socket.addEventListener("message", function (evt) {
         span.classList.add("btn-group", "bt-device");
         icon.classList.add("btn");
         label.classList.add("btn");
-        if (msg.name !== null && msg.name.toLowerCase().startsWith("egg")) {
+        if (msg.name === "Egg.") {
             span.setAttribute("title", "Potential egg");
             icon.classList.add("btn-outline-primary");
             label.classList.add("btn-outline-primary");
@@ -86,7 +91,16 @@ socket.addEventListener("message", function (evt) {
 
         span.appendChild(icon);
         span.appendChild(label);
-        newDev.appendChild(span);
+
+        if (msg.name === "Egg.") {
+            let a = document.createElement("a");
+            a.classList.add("no-underline");
+            a.setAttribute("href", (msg.connected ? "/disconnect/" : "/connect/") + msg.macaddr);
+            a.appendChild(span);
+            newDev.appendChild(a);
+        } else {
+            newDev.appendChild(span);
+        }
 
         let devices = document.getElementsByClassName("bt-device");
         if (msg.rssi !== null) {

@@ -1,8 +1,9 @@
+from itertools import chain, product
 from traceback import print_exc
 from functools import partial
-from itertools import chain
 from time import sleep
 from uuid import UUID
+import operator
 import sqlite3
 import atexit
 import random
@@ -34,6 +35,33 @@ if has_bluetooth:
 
     ble = able.get_provider()
 
+    # TODO: upstream this
+    def prop_suppress(prop):
+        old = prop.fget
+        def new(self):
+            try:
+                return old(self)
+            except DBusException as e:
+                if e.get_dbus_name() != "org.freedesktop.DBus.Error.InvalidArgs":
+                    raise
+            return None
+        return prop.getter(new)
+
+    bzd = able.bluez_dbus.device.BluezDevice
+    bzd.name = prop_suppress(bzd.name)
+    bzd.rssi = prop_suppress(bzd.rssi)
+
+    def prop_to_type(prop, type):
+        old = prop.fget
+        return prop.getter(lambda self: type(old(self)))
+
+    bzd.advertised = prop_to_type(bzd.advertised, tuple)
+    #bzd.id = prop_to_type(bzd.id, UUID)
+
+    # make the name of the device significant (we want to notice the difference
+    # so we can update the database)
+    able.interfaces.Device.__hash__ = lambda self: hash((self.id, self.name, self.rssi, self.is_connected))
+
 if has_uwsgi:
     from threading import Thread
     import queue
@@ -42,7 +70,7 @@ if has_uwsgi:
 
 
 def get_dummy_mac():
-    return (":".join(["{:02x}", ] * 6)).format(*os.urandom(6))
+    return (":".join(["{:02x}", ] * 6)).format(*os.urandom(6)).upper()
 
 
 def dummy_worker():
@@ -70,10 +98,16 @@ def dummy_worker():
                 uwsgi.signal(1)
                 try:
                     for msg in queue_timeout_iter(q, wait):
-                        if msg[0] == "restart":
+                        if msg == [b"restart"]:
                             return
-                        elif msg[0] == "ping":
+                        elif msg == [b"ping"]:
                             uwsgi.signal(3)  # pong
+                        elif len(msg) == 2 and msg[0] == b"connect":
+                            db.execute("UPDATE bluetooth SET connected = 1 WHERE macaddr = ?", (msg[1].decode(),))
+                            db.commit()
+                        elif len(msg) == 2 and msg[0] == b"disconnect":
+                            db.execute("UPDATE bluetooth SET connected = 0 WHERE macaddr = ?", (msg[1].decode(),))
+                            db.commit()
                 except queue.Empty:
                     pass
             else:
@@ -82,10 +116,16 @@ def dummy_worker():
             if has_uwsgi:
                 try:
                     for msg in iter(q.get, None):
-                        if msg[0] == "restart":
+                        if msg == [b"restart"]:
                             return
-                        elif msg[0] == "ping":
+                        elif msg == [b"ping"]:
                             uwsgi.signal(3)  # pong
+                        elif len(msg) == 2 and msg[0] == b"connect":
+                            db.execute("UPDATE bluetooth SET connected = 1 WHERE macaddr = ?", (msg[1].decode(),))
+                            db.commit()
+                        elif len(msg) == 2 and msg[0] == b"disconnect":
+                            db.execute("UPDATE bluetooth SET connected = 0 WHERE macaddr = ?", (msg[1].decode(),))
+                            db.commit()
                 except queue.Empty:
                     pass
             else:
@@ -101,8 +141,8 @@ def dummy_worker():
 
 def push_mule_events():
     for msg in iter(uwsgi.mule_get_msg, b"exit"):
-        target, *m = msg.decode().split()
-        if target == "bt":
+        target, *m = msg.split(b" ")
+        if target == b"bt":
             q.put(m)
 
 
@@ -138,59 +178,60 @@ def worker():
             (adapter.macaddr, adapter.name))
         db.commit()
 
-        # TODO: upstream this
-        def prop_suppress(prop):
-            old = prop.fget
-            def new(self):
-                try:
-                    return old(self)
-                except DBusException as e:
-                    if e.get_dbus_name() != "org.freedesktop.DBus.Error.InvalidArgs":
-                        raise
-                return None
-            return prop.getter(new)
-
-
-        bzd = able.bluez_dbus.device.BluezDevice
-        bzd.name = prop_suppress(bzd.name)
-        bzd.rssi = prop_suppress(bzd.rssi)
-
-        def prop_tuplify(prop):
-            old = prop.fget
-            return prop.getter(lambda self: tuple(old(self)))
-
-        bzd.advertised = prop_tuplify(bzd.advertised)
-
-        # make the name of the device significant (we want to notice the difference
-        # so we can update the database)
-        able.interfaces.Device.__hash__ = lambda self: hash((self.id, self.name, self.rssi))
-
         adapter.power_on()
         adapter.start_scan()
-        atexit.register(adapter.stop_scan)
-        atexit.register(adapter.power_off)
+        atexit.register(partial(adapter.stop_scan, 5))
+        #atexit.register(adapter.power_off)
 
         known = set()
         while True:
             found = set(ble.list_devices())
             new = found - known
+            known -= set(filter(lambda x: x[0].id == x[1].id, product(new, known)))
             known.update(new)
             for device in new:
                 db.execute("REPLACE INTO bluetooth VALUES(?, ?, ?, ?, 0)",
                     (device.id, device.name, device.rssi, device.is_connected))
             db.commit()
             if has_uwsgi:
-                uwsgi.signal(1)
+                if len(new) > 0:
+                    uwsgi.signal(1)
                 try:
                     for msg in queue_timeout_iter(q, 1):
-                        if msg[0] == "restart":
+                        if msg == [b"restart"]:
                             return
-                        elif msg[0] == "ping":
+                        elif msg == [b"ping"]:
                             uwsgi.signal(3)  # pong
+                        elif len(msg) == 2 and msg[0] == b"connect":
+                            macaddr = msg[1].decode()
+                            for dev in known:
+                                if dev.id == macaddr:
+                                    dev.connect(0)
+                                    break
+                        elif len(msg) == 2 and msg[0] == b"disconnect":
+                            macaddr = msg[1].decode()
+                            for dev in known:
+                                if dev.id == macaddr:
+                                    dev.disconnect(0)
+                                    break
+                        elif len(msg) >= 3 and msg[0] == b"send":
+                            macaddr = msg[1].decode()
+                            for dev in known:
+                                if dev.id == macaddr and dev.is_connected:
+                                    svc = dev.find_service(SERVO_SERVICE_UUID)
+                                    if svc is None:
+                                        break
+                                    angle = svc.find_characteristic(SERVO_ANGLE_CHAR_UUID)
+                                    if angle is None:
+                                        break
+                                    angle.write_value(b" ".join(msg[2:]))
                 except queue.Empty:
                     pass
             else:
                 sleep(1)
+            #for dev in new:
+            #    if dev.is_connected and not dev.discover([SERVO_SERVICE_UUID], [SERVO_ANGLE_CHAR_UUID], 10):
+            #        dev.disconnect(5)
     finally:
         try:
             db.execute("DELETE FROM bluetooth WHERE hostDev = 1")

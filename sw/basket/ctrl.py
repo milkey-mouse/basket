@@ -1,6 +1,7 @@
 from socket import gethostname, gethostbyname
 from threading import Event
 from time import sleep
+from uuid import UUID
 import json
 from flask import Blueprint, render_template, redirect, request, url_for, session
 from .utils import ip_addresses, get_temp, get_ble_addr, hashabledict, with_query_string, ping_worker
@@ -55,6 +56,19 @@ def bluetooth_restart():
         uwsgi.mule_msg(b"bt restart", 1)
     return redirect(url_for(".bluetooth"))
 
+@bp.route("/connect/<macaddr>")
+@login_required
+def connect(macaddr):
+    if has_uwsgi:
+        uwsgi.mule_msg(b"bt connect " + macaddr.upper().encode(), 1)
+    return redirect(url_for(".bluetooth"))
+
+@bp.route("/disconnect/<macaddr>")
+@login_required
+def disconnect(macaddr):
+    if has_uwsgi:
+        uwsgi.mule_msg(b"bt disconnect " + macaddr.upper().encode(), 1)
+    return redirect(url_for(".bluetooth"))
 
 if has_uwsgi:
 
