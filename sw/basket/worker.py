@@ -12,8 +12,6 @@ from click import command
 from .utils import queue_timeout_iter
 from . import create_base
 
-#SERVO_SERVICE_UUID = UUID(""
-
 has_bluetooth = True
 try:
     import Adafruit_BluefruitLE as able
@@ -29,6 +27,11 @@ except ImportError:
     has_uwsgi = False
 
 if has_bluetooth:
+    from uuid import UUID
+
+    SERVO_SERVICE_UUID = UUID("00000420-0000-1000-8000-00805F9B34FB")
+    SERVO_ANGLE_CHAR_UUID = UUID("00001337-0000-1000-8000-00805F9B34FB")
+
     ble = able.get_provider()
 
 if has_uwsgi:
@@ -51,7 +54,7 @@ def dummy_worker():
 
     try:
         db.execute("DELETE FROM bluetooth")
-        db.execute("INSERT INTO bluetooth VALUES(?, ?, NULL, 1)",
+        db.execute("INSERT INTO bluetooth VALUES(?, ?, NULL, 1, 1)",
             (get_dummy_mac(), "Dummy Adapter"))
         db.commit()
         if has_uwsgi:
@@ -59,8 +62,8 @@ def dummy_worker():
 
 
         for i in range(0, 10):
-            db.execute("INSERT INTO bluetooth VALUES(?, ?, ?, 0)",
-                       (get_dummy_mac(), random.choice(("Egg", None)), random.randint(-128, 0)))
+            db.execute("INSERT INTO bluetooth VALUES(?, ?, ?, 0, 0)",
+                       (get_dummy_mac(), random.choice(("Egg.", None)), random.randint(-128, 0)))
             db.commit()
             wait = 1 + random.random() * 2
             if has_uwsgi:
@@ -131,7 +134,7 @@ def worker():
             able.bluez_dbus.adapter._INTERFACE,
             "Address"
         )
-        db.execute("REPLACE INTO bluetooth VALUES(?, ?, NULL, 1)",
+        db.execute("REPLACE INTO bluetooth VALUES(?, ?, NULL, 1, 1)",
             (adapter.macaddr, adapter.name))
         db.commit()
 
@@ -152,15 +155,29 @@ def worker():
         bzd.name = prop_suppress(bzd.name)
         bzd.rssi = prop_suppress(bzd.rssi)
 
+        def prop_tuplify(prop):
+            old = prop.fget
+            return prop.getter(lambda self: tuple(old(self)))
+
+        bzd.advertised = prop_tuplify(bzd.advertised)
+
+        # make the name of the device significant (we want to notice the difference
+        # so we can update the database)
+        able.interfaces.Device.__hash__ = lambda self: hash((self.id, self.name, self.rssi))
+
         adapter.power_on()
         adapter.start_scan()
         atexit.register(adapter.stop_scan)
         atexit.register(adapter.power_off)
 
+        known = set()
         while True:
-            for device in ble.list_devices():
-                db.execute("REPLACE INTO bluetooth VALUES(?, ?, ?, 0)",
-                    (device.id, device.name, device.rssi))
+            found = set(ble.list_devices())
+            new = found - known
+            known.update(new)
+            for device in new:
+                db.execute("REPLACE INTO bluetooth VALUES(?, ?, ?, ?, 0)",
+                    (device.id, device.name, device.rssi, device.is_connected))
             db.commit()
             if has_uwsgi:
                 uwsgi.signal(1)

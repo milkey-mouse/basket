@@ -5,6 +5,7 @@ CREATE TABLE bluetooth (
     macaddr TEXT UNIQUE NOT NULL,
     name TEXT,
     rssi INTEGER,
+    connected BOOLEAN,
     hostdev BOOLEAN
 );
 
