@@ -217,13 +217,23 @@ def worker():
                             macaddr = msg[1].decode()
                             for dev in known:
                                 if dev.id == macaddr and dev.is_connected:
-                                    svc = dev.find_service(SERVO_SERVICE_UUID)
-                                    if svc is None:
-                                        break
-                                    angle = svc.find_characteristic(SERVO_ANGLE_CHAR_UUID)
-                                    if angle is None:
-                                        break
-                                    angle.write_value(b" ".join(msg[2:]))
+                                    try:
+                                        if "svc" not in vars(dev):
+                                            svc = dev.find_service(SERVO_SERVICE_UUID)
+                                            if svc is None:
+                                                break
+                                            dev.svc = svc
+
+                                        if "angle" not in vars(dev):
+                                            angle = dev.svc.find_characteristic(SERVO_ANGLE_CHAR_UUID)
+                                            if angle is None:
+                                                break
+                                            dev.angle = angle
+
+                                        dev.angle.write_value(b" ".join(msg[2:]))
+                                    except DBusException as e:
+                                        if e.get_dbus_name() != "org.freedesktop.DBus.Error.InvalidArgs":
+                                            raise
             else:
                 sleep(1)
             #for dev in new:

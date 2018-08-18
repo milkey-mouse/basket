@@ -1,0 +1,70 @@
+{% extends "/base.html" %}
+{% set active_page = "ctrl.control" -%}
+{% block head %}
+  <style>#angle {width: 100%}</style>
+{% endblock %}
+{% block icon %}{{ icon('settings') }}{% endblock %}
+{% block content %}
+    <div id="ws-connected" class="alert alert-success alert-dismissible" role="alert" hidden>
+      <p>WebSocket is connected.</p>
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    <div id="ws-error" class="alert alert-danger alert-dismissible" role="alert" hidden>
+      <p>The WebSocket closed unexpectedly.</p>
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    <input id="angle" type="range" min="0" max="180" value="90">
+    <p>{{ 'Connecting to' if connecting else 'Disconnecting from' }} device <code>{{ macaddr }}</code>...</p>
+{% endblock %}
+{% block script %}
+<script>
+const proto = (location.protocol == "https:" ? "wss:" : "ws:") + "//";
+const socket = new WebSocket(proto + location.host + location.pathname + "/ws");
+
+socket.addEventListener("open", function(evt) {
+    document.getElementById("ws-connected").removeAttribute("hidden");
+});
+
+socket.addEventListener("close", function(evt) {
+    if (event.code === 1000) {
+        // socket was closed normally, try to reconnect
+        socket.open();
+    } else {
+        document.getElementById("ws-connected").setAttribute("hidden", true);
+        let err = document.getElementById("ws-error");
+        err.getElementsByTagName("p")[0].innerText = "The WebSocket closed unexpectedly: " + evt.reason + " (Code " + evt.code + "). This page will not automatically update.";
+        err.removeAttribute("hidden");
+    }
+});
+
+socket.addEventListener("error", function(evt) {
+    document.getElementById("ws-connected").setAttribute("hidden", true);
+    let err = document.getElementById("ws-error");
+    err.getElementsByTagName("p")[0].innerText = "There was an error with the WebSocket: " + evt + ". This page will not automatically update.";
+    err.removeAttribute("hidden");
+});
+
+document.getElementById("angle").addEventListener("change", function(evt) {
+    if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({
+            "devices": ["80:7D:3A:81:54:3E", "B4:E6:2D:C8:58:C7", "B4:E6:2D:C8:58:C7"],
+            "angle": parseInt(this.value)
+        }));
+    }
+}, false);
+
+Array.prototype.forEach.call(document.getElementsByClassName("alert"), function(el) {
+    el.getElementsByTagName("button")[0].addEventListener("click", function() {
+        el.setAttribute("hidden", true);
+    });
+});
+
+if (socket.readyState === WebSocket.OPEN) {
+    document.getElementById("ws-connected").removeAttribute("hidden");
+}
+</script>
+{% endblock %}

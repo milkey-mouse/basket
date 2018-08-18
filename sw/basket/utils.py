@@ -67,7 +67,7 @@ if has_uwsgi:
     def ping_worker():
         pong.clear()
         uwsgi.mule_msg(b"bt ping", 1)
-        return pong.wait(3)
+        return pong.wait(2)
 else:
     def ping_worker():
         for pid in filter(lambda x: x.isdigit(), os.listdir("/proc")):

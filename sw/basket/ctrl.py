@@ -1,5 +1,7 @@
 from socket import gethostname, gethostbyname
 from threading import Event
+from contextlib import suppress
+from struct import pack
 from time import sleep
 from uuid import UUID
 import json
@@ -49,12 +51,20 @@ def bluetooth():
     return render_template("ctrl/bluetooth.html", devices=devices)
 
 
+@bp.route("/control")
+@login_required
+def control():
+    devices = get_db().execute("SELECT * FROM bluetooth WHERE connected = 1 AND hostdev = 0").fetchall()
+    return render_template("ctrl/control.html", devices=devices)
+
+
 @bp.route("/bluetooth/restart")
 @login_required
 def bluetooth_restart():
     if has_uwsgi:
         uwsgi.mule_msg(b"bt restart", 1)
     return redirect(url_for(".bluetooth"))
+
 
 @bp.route("/connect/<macaddr>")
 @login_required
@@ -63,12 +73,14 @@ def connect(macaddr):
         uwsgi.mule_msg(b"bt connect " + macaddr.upper().encode(), 1)
     return render_template("ctrl/connect.html", macaddr=macaddr, connecting=True)
 
+
 @bp.route("/disconnect/<macaddr>")
 @login_required
 def disconnect(macaddr):
     if has_uwsgi:
         uwsgi.mule_msg(b"bt disconnect " + macaddr.upper().encode(), 1)
     return render_template("ctrl/connect.html", macaddr=macaddr, connecting=False)
+
 
 if has_uwsgi:
 
@@ -83,7 +95,7 @@ if has_uwsgi:
                     return redirect(with_query_string(url_for('auth.login'), "next", request.url))
                 bt_changed.clear()
                 db = get_db()
-                try:
+                with suppress(SystemError, OSError):
                     while True:
                         old = set(filter(lambda x: not x["hostdev"], map(hashabledict, db.execute("SELECT * FROM bluetooth").fetchall())))
                         while not bt_changed.wait(1):
@@ -97,5 +109,14 @@ if has_uwsgi:
                                 ws.send(json.dumps(dict(**device, action="del")))
                             for device in new - old:
                                 ws.send(json.dumps(dict(**device, action="add")))
-                except (SystemError, OSError):
-                    pass
+
+        @ws.route("/control/ws")
+        def control_ws(ws):
+            with app.request_context(ws.environ):
+                if not session.get("logged_in"):
+                    return redirect(with_query_string(url_for('auth.login'), "next", request.url))
+            with suppress(SystemError, OSError):
+                for raw_msg in iter(ws.receive, None):
+                    msg = json.loads(raw_msg.decode())
+                    for dev in msg["devices"]:
+                        uwsgi.mule_msg(b"bt send " + dev.encode() + b" " + pack("B", msg["angle"]))
