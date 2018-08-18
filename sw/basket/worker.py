@@ -1,4 +1,5 @@
 from itertools import chain, product
+from contextlib import suppress
 from traceback import print_exc
 from functools import partial
 from time import sleep
@@ -96,46 +97,44 @@ def dummy_worker():
             wait = 1 + random.random() * 2
             if has_uwsgi:
                 uwsgi.signal(1)
-                try:
+                with suppress(queue.Empty):
                     for msg in queue_timeout_iter(q, wait):
                         if msg == [b"restart"]:
                             return
                         elif msg == [b"ping"]:
                             uwsgi.signal(3)  # pong
                         elif len(msg) == 2 and msg[0] == b"connect":
+                            sleep(1)
                             db.execute("UPDATE bluetooth SET connected = 1 WHERE macaddr = ?", (msg[1].decode(),))
                             db.commit()
                         elif len(msg) == 2 and msg[0] == b"disconnect":
+                            sleep(1)
                             db.execute("UPDATE bluetooth SET connected = 0 WHERE macaddr = ?", (msg[1].decode(),))
                             db.commit()
-                except queue.Empty:
-                    pass
             else:
                 sleep(wait)
         while True:
             if has_uwsgi:
-                try:
+                with suppress(queue.Empty):
                     for msg in iter(q.get, None):
                         if msg == [b"restart"]:
                             return
                         elif msg == [b"ping"]:
                             uwsgi.signal(3)  # pong
                         elif len(msg) == 2 and msg[0] == b"connect":
+                            sleep(1)
                             db.execute("UPDATE bluetooth SET connected = 1 WHERE macaddr = ?", (msg[1].decode(),))
                             db.commit()
                         elif len(msg) == 2 and msg[0] == b"disconnect":
+                            sleep(1)
                             db.execute("UPDATE bluetooth SET connected = 0 WHERE macaddr = ?", (msg[1].decode(),))
                             db.commit()
-                except queue.Empty:
-                    pass
             else:
                 sleep(1)
     finally:
-        try:
+        with suppress(Exception):
             db.execute("DELETE FROM bluetooth WHERE hostDev = 1")
             db.commit()
-        except:
-            pass
         db.close()
 
 
@@ -159,10 +158,8 @@ def worker():
         if has_uwsgi:
             uwsgi.signal(1)
 
-        try:
+        with suppress(DBusException):
             ble.clear_cached_data()
-        except DBusException:
-            pass
         adapters = ble.list_adapters()
 
         if len(adapters) == 0:
@@ -180,7 +177,7 @@ def worker():
 
         adapter.power_on()
         adapter.start_scan()
-        atexit.register(partial(adapter.stop_scan, 5))
+        #atexit.register(partial(adapter.stop_scan, 5))
         #atexit.register(adapter.power_off)
 
         known = set()
@@ -196,7 +193,7 @@ def worker():
             if has_uwsgi:
                 if len(new) > 0:
                     uwsgi.signal(1)
-                try:
+                with suppress(queue.Empty):
                     for msg in queue_timeout_iter(q, 1):
                         if msg == [b"restart"]:
                             return
@@ -206,13 +203,15 @@ def worker():
                             macaddr = msg[1].decode()
                             for dev in known:
                                 if dev.id == macaddr:
-                                    dev.connect(0)
+                                    with suppress(RuntimeError):
+                                        dev.connect(0)
                                     break
                         elif len(msg) == 2 and msg[0] == b"disconnect":
                             macaddr = msg[1].decode()
                             for dev in known:
                                 if dev.id == macaddr:
-                                    dev.disconnect(0)
+                                    with suppress(RuntimeError):
+                                        dev.disconnect(0)
                                     break
                         elif len(msg) >= 3 and msg[0] == b"send":
                             macaddr = msg[1].decode()
@@ -225,19 +224,15 @@ def worker():
                                     if angle is None:
                                         break
                                     angle.write_value(b" ".join(msg[2:]))
-                except queue.Empty:
-                    pass
             else:
                 sleep(1)
             #for dev in new:
             #    if dev.is_connected and not dev.discover([SERVO_SERVICE_UUID], [SERVO_ANGLE_CHAR_UUID], 10):
             #        dev.disconnect(5)
     finally:
-        try:
+        with suppress(Exception):
             db.execute("DELETE FROM bluetooth WHERE hostDev = 1")
             db.commit()
-        except:
-            pass
         db.close()
 
 

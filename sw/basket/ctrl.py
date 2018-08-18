@@ -61,14 +61,14 @@ def bluetooth_restart():
 def connect(macaddr):
     if has_uwsgi:
         uwsgi.mule_msg(b"bt connect " + macaddr.upper().encode(), 1)
-    return redirect(url_for(".bluetooth"))
+    return render_template("ctrl/connect.html", macaddr=macaddr, connecting=True)
 
 @bp.route("/disconnect/<macaddr>")
 @login_required
 def disconnect(macaddr):
     if has_uwsgi:
         uwsgi.mule_msg(b"bt disconnect " + macaddr.upper().encode(), 1)
-    return redirect(url_for(".bluetooth"))
+    return render_template("ctrl/connect.html", macaddr=macaddr, connecting=False)
 
 if has_uwsgi:
 

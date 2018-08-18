@@ -74,7 +74,10 @@ socket.addEventListener("message", function (evt) {
         span.classList.add("btn-group", "bt-device");
         icon.classList.add("btn");
         label.classList.add("btn");
-        if (msg.name === "Egg.") {
+        if (msg.connected == true) {
+            icon.classList.add("btn-outline-success");
+            label.classList.add("btn-outline-success");
+        } else if (msg.name === "Egg.") {
             span.setAttribute("title", "Potential egg");
             icon.classList.add("btn-outline-primary");
             label.classList.add("btn-outline-primary");
