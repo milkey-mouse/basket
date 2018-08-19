@@ -11,7 +11,6 @@ import random
 import sys
 import os
 from click import command
-from .utils import mule_msg_iter
 from . import create_base
 
 has_bluetooth = True
@@ -67,6 +66,9 @@ if has_bluetooth:
     # make the name of the device significant (we want to notice the difference
     # so we can update the database)
     able.interfaces.Device.__hash__ = lambda self: hash((self.id, self.name, self.rssi, self.is_connected))
+
+if has_uwsgi:
+    from .utils import mule_msg_iter
 
 
 def get_dummy_mac():
