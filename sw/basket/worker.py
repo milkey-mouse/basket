@@ -1,7 +1,7 @@
+from functools import partial, lru_cache
 from itertools import chain, product
 from contextlib import suppress
 from traceback import print_exc
-from functools import partial
 from time import sleep
 from uuid import UUID
 import operator
@@ -11,7 +11,7 @@ import random
 import sys
 import os
 from click import command
-from .utils import queue_timeout_iter
+from .utils import mule_msg_iter
 from . import create_base
 
 has_bluetooth = True
@@ -43,7 +43,7 @@ if has_bluetooth:
             try:
                 return old(self)
             except DBusException as e:
-                if e.get_dbus_name() != "org.freedesktop.DBus.Error.InvalidArgs":
+                if e.get_dbus_name() not in ("org.freedesktop.DBus.Error.InvalidArgs", "org.freedesktop.DBus.Error.UnknownObject"):
                     raise
             return None
         return prop.getter(new)
@@ -51,6 +51,11 @@ if has_bluetooth:
     bzd = able.bluez_dbus.device.BluezDevice
     bzd.name = prop_suppress(bzd.name)
     bzd.rssi = prop_suppress(bzd.rssi)
+
+    # don't upstream these
+    bzd.id = prop_suppress(bzd.id)
+    bzd.is_connected = prop_suppress(bzd.is_connected)
+
 
     def prop_to_type(prop, type):
         old = prop.fget
@@ -62,12 +67,6 @@ if has_bluetooth:
     # make the name of the device significant (we want to notice the difference
     # so we can update the database)
     able.interfaces.Device.__hash__ = lambda self: hash((self.id, self.name, self.rssi, self.is_connected))
-
-if has_uwsgi:
-    from threading import Thread
-    import queue
-
-    q = queue.Queue()
 
 
 def get_dummy_mac():
@@ -97,38 +96,38 @@ def dummy_worker():
             wait = 1 + random.random() * 2
             if has_uwsgi:
                 uwsgi.signal(1)
-                with suppress(queue.Empty):
-                    for msg in queue_timeout_iter(q, wait):
-                        if msg == [b"restart"]:
-                            return
-                        elif msg == [b"ping"]:
-                            uwsgi.signal(3)  # pong
-                        elif len(msg) == 2 and msg[0] == b"connect":
-                            sleep(1)
-                            db.execute("UPDATE bluetooth SET connected = 1 WHERE macaddr = ?", (msg[1].decode(),))
-                            db.commit()
-                        elif len(msg) == 2 and msg[0] == b"disconnect":
-                            sleep(1)
-                            db.execute("UPDATE bluetooth SET connected = 0 WHERE macaddr = ?", (msg[1].decode(),))
-                            db.commit()
+                for raw_msg in filter(lambda x: x.startswith(b"bt "), mule_msg_iter(timeout)):
+                    msg = raw_msg.split(b" ")[1:]
+                    if msg == [b"restart"]:
+                        return
+                    elif msg == [b"ping"]:
+                        uwsgi.signal(3)  # pong
+                    elif len(msg) == 2 and msg[0] == b"connect":
+                        sleep(1)
+                        db.execute("UPDATE bluetooth SET connected = 1 WHERE macaddr = ?", (msg[1].decode(),))
+                        db.commit()
+                    elif len(msg) == 2 and msg[0] == b"disconnect":
+                        sleep(1)
+                        db.execute("UPDATE bluetooth SET connected = 0 WHERE macaddr = ?", (msg[1].decode(),))
+                        db.commit()
             else:
                 sleep(wait)
         while True:
             if has_uwsgi:
-                with suppress(queue.Empty):
-                    for msg in iter(q.get, None):
-                        if msg == [b"restart"]:
-                            return
-                        elif msg == [b"ping"]:
-                            uwsgi.signal(3)  # pong
-                        elif len(msg) == 2 and msg[0] == b"connect":
-                            sleep(1)
-                            db.execute("UPDATE bluetooth SET connected = 1 WHERE macaddr = ?", (msg[1].decode(),))
-                            db.commit()
-                        elif len(msg) == 2 and msg[0] == b"disconnect":
-                            sleep(1)
-                            db.execute("UPDATE bluetooth SET connected = 0 WHERE macaddr = ?", (msg[1].decode(),))
-                            db.commit()
+                for raw_msg in filter(lambda x: x.startswith(b"bt "), mule_msg_iter(1)):
+                    msg = raw_msg.split(b" ")[1:]
+                    if msg == [b"restart"]:
+                        return
+                    elif msg == [b"ping"]:
+                        uwsgi.signal(3)  # pong
+                    elif len(msg) == 2 and msg[0] == b"connect":
+                        sleep(1)
+                        db.execute("UPDATE bluetooth SET connected = 1 WHERE macaddr = ?", (msg[1].decode(),))
+                        db.commit()
+                    elif len(msg) == 2 and msg[0] == b"disconnect":
+                        sleep(1)
+                        db.execute("UPDATE bluetooth SET connected = 0 WHERE macaddr = ?", (msg[1].decode(),))
+                        db.commit()
             else:
                 sleep(1)
     finally:
@@ -136,13 +135,6 @@ def dummy_worker():
             db.execute("DELETE FROM bluetooth WHERE hostDev = 1")
             db.commit()
         db.close()
-
-
-def push_mule_events():
-    for msg in iter(uwsgi.mule_get_msg, b"exit"):
-        target, *m = msg.split(b" ")
-        if target == b"bt":
-            q.put(m)
 
 
 def worker():
@@ -158,8 +150,10 @@ def worker():
         if has_uwsgi:
             uwsgi.signal(1)
 
-        with suppress(DBusException):
-            ble.clear_cached_data()
+        if uwsgi.mule_id() == 1:
+            with suppress(DBusException):
+                ble.clear_cached_data()
+
         adapters = ble.list_adapters()
 
         if len(adapters) == 0:
@@ -171,69 +165,90 @@ def worker():
             able.bluez_dbus.adapter._INTERFACE,
             "Address"
         )
-        db.execute("REPLACE INTO bluetooth VALUES(?, ?, NULL, 1, 1)",
-            (adapter.macaddr, adapter.name))
-        db.commit()
 
-        adapter.power_on()
-        adapter.start_scan()
-        #atexit.register(partial(adapter.stop_scan, 5))
-        #atexit.register(adapter.power_off)
-
-        known = set()
-        while True:
-            found = set(ble.list_devices())
-            new = found - known
-            known -= set(filter(lambda x: x[0].id == x[1].id, product(new, known)))
-            known.update(new)
-            for device in new:
-                db.execute("REPLACE INTO bluetooth VALUES(?, ?, ?, ?, 0)",
-                    (device.id, device.name, device.rssi, device.is_connected))
+        if uwsgi.mule_id() == 1:
+            db.execute("REPLACE INTO bluetooth VALUES(?, ?, NULL, 1, 1)",
+                (adapter.macaddr, adapter.name))
             db.commit()
-            if has_uwsgi:
-                if len(new) > 0:
+
+            adapter.power_on()
+            adapter.start_scan()
+            #atexit.register(partial(adapter.stop_scan, 5))
+            #atexit.register(adapter.power_off)
+
+        scan = True
+        known = set()
+
+        @lru_cache(16)
+        def get_dev_by_id(macaddr):
+            try:
+                return next(filter(lambda x: x.id == macaddr, known))
+            except StopIteration:
+                raise KeyError
+
+        while True:
+            if scan:
+                found = set(ble.list_devices())
+                new = found - known
+                known -= set(filter(lambda x: x[0].id == x[1].id, product(new, known)))
+                for device in new:
+                    device.svc = None
+                    device.angle = None
+                    db.execute("REPLACE INTO bluetooth VALUES(?, ?, ?, ?, 0)",
+                        (device.id, device.name, device.rssi, device.is_connected))
+                db.commit()
+                known.update(new)
+                if has_uwsgi and len(new) > 0:
                     uwsgi.signal(1)
-                with suppress(queue.Empty):
-                    for msg in queue_timeout_iter(q, 1):
-                        if msg == [b"restart"]:
-                            return
-                        elif msg == [b"ping"]:
-                            uwsgi.signal(3)  # pong
-                        elif len(msg) == 2 and msg[0] == b"connect":
-                            macaddr = msg[1].decode()
-                            for dev in known:
-                                if dev.id == macaddr:
-                                    with suppress(RuntimeError):
-                                        dev.connect(0)
-                                    break
-                        elif len(msg) == 2 and msg[0] == b"disconnect":
-                            macaddr = msg[1].decode()
-                            for dev in known:
-                                if dev.id == macaddr:
-                                    with suppress(RuntimeError):
-                                        dev.disconnect(0)
-                                    break
-                        elif len(msg) >= 3 and msg[0] == b"send":
-                            macaddr = msg[1].decode()
-                            for dev in known:
-                                if dev.id == macaddr and dev.is_connected:
-                                    try:
-                                        if "svc" not in vars(dev):
-                                            svc = dev.find_service(SERVO_SERVICE_UUID)
-                                            if svc is None:
-                                                break
-                                            dev.svc = svc
+            if has_uwsgi:
+                for raw_msg in filter(lambda x: x.startswith(b"bt "), mule_msg_iter(5)):
+                    print("worker {} processing".format(uwsgi.mule_id()), raw_msg)
+                    msg = raw_msg.split(b" ")[1:]
+                    if msg == [b"restart"]:
+                        return
+                    elif msg == [b"ping"]:
+                        uwsgi.signal(3)  # pong
+                    elif len(msg) == 2 and msg[0] == [b"scan"]:
+                        with suppress(KeyError):
+                            scan = {b"on": True, b"off": False}[msg[1]]
+                    elif len(msg) == 2 and msg[0] == b"connect":
+                        macaddr = msg[1].decode()
+                        with suppress(RuntimeError, KeyError):
+                            get_dev_by_id(macaddr).connect(0)
+                    elif len(msg) == 2 and msg[0] == b"disconnect":
+                        macaddr = msg[1].decode()
+                        with suppress(RuntimeError, KeyError):
+                            get_dev_by_id(macaddr).disconnect(0)
+                    elif len(msg) >= 3 and msg[0] == b"send":
+                        if uwsgi.mule_id() == 1:
+                            scan = False
+                        macaddr = msg[1].decode()
+                        try:
+                            dev = get_dev_by_id(macaddr)
+                        except KeyError:
+                            print("cache miss")
+                            get_dev_by_id.cache_clear()
+                            continue
 
-                                        if "angle" not in vars(dev):
-                                            angle = dev.svc.find_characteristic(SERVO_ANGLE_CHAR_UUID)
-                                            if angle is None:
-                                                break
-                                            dev.angle = angle
+                        if not dev.is_connected:
+                            continue
 
-                                        dev.angle.write_value(b" ".join(msg[2:]))
-                                    except DBusException as e:
-                                        if e.get_dbus_name() != "org.freedesktop.DBus.Error.InvalidArgs":
-                                            raise
+                        if dev.svc is None:
+                            dev.svc = dev.find_service(SERVO_SERVICE_UUID)
+                        if dev.svc is None:
+                            continue
+
+                        if dev.angle is None:
+                            dev.angle = dev.svc.find_characteristic(SERVO_ANGLE_CHAR_UUID)
+                        if dev.angle is None:
+                            continue
+
+                        try:
+                            dev.angle.write_value(b" ".join(msg[2:]))
+                        except DBusException as e:
+                            # multiple cores may be trying to write to the characteristic
+                            if e.get_dbus_name() != "org.bluez.Error.InProgress":
+                                raise
             else:
                 sleep(1)
             #for dev in new:
@@ -249,9 +264,6 @@ def worker():
 def run_dummy_worker():
     print("Dummy worker running.")
     dummy_worker.db_path = create_base().config["DATABASE"]
-    if has_uwsgi:
-        t = Thread(target=push_mule_events)
-        t.start()
     try:
         while True:
             dummy_worker()
@@ -259,10 +271,6 @@ def run_dummy_worker():
                 break
     except Exception:
         print_exc()  # because uWSGI/Flask won't do it for us...
-    finally:
-        if has_uwsgi:
-            uwsgi.mule_msg(b"exit", uwsgi.mule_id())
-            t.join()
 
 
 def run_worker():
@@ -274,9 +282,6 @@ def run_worker():
         return
     print("Worker running.")
     worker.db_path = create_base().config["DATABASE"]
-    if has_uwsgi:
-        t = Thread(target=push_mule_events)
-        t.start()
     try:
         ble.initialize()
         while True:
@@ -285,10 +290,6 @@ def run_worker():
                 break
     except Exception:
         print_exc()
-    finally:
-        if has_uwsgi:
-            uwsgi.mule_msg(b"exit", uwsgi.mule_id())
-            t.join()
 
 
 def init_app(app):

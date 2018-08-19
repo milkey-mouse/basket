@@ -2,6 +2,7 @@ from operator import itemgetter
 from threading import Event
 from time import monotonic
 from queue import Empty
+from math import ceil
 import subprocess
 import netifaces
 import os
@@ -67,7 +68,18 @@ if has_uwsgi:
     def ping_worker():
         pong.clear()
         uwsgi.mule_msg(b"bt ping", 1)
-        return pong.wait(2)
+        return pong.wait(3)
+
+    def mule_msg_iter(timeout):
+        end = monotonic() + timeout
+        while True:
+            timeout = max(0, end - monotonic())
+            # secret timeout parameter that only cool kids know about!!!
+            item = uwsgi.mule_get_msg(timeout=int(ceil(timeout)))
+            if item is not None and len(item) > 0:
+                yield item
+            elif timeout == 0:
+                break
 else:
     def ping_worker():
         for pid in filter(lambda x: x.isdigit(), os.listdir("/proc")):

@@ -1,6 +1,6 @@
 from socket import gethostname, gethostbyname
-from threading import Event
 from contextlib import suppress
+from threading import Event
 from struct import pack
 from time import sleep
 from uuid import UUID
@@ -18,7 +18,6 @@ except ImportError:
 
 bp = Blueprint("ctrl", __name__)
 ws = Blueprint("wsCtrl", __name__)
-
 
 @bp.route("/")
 @login_required
@@ -112,11 +111,16 @@ if has_uwsgi:
 
         @ws.route("/control/ws")
         def control_ws(ws):
-            with app.request_context(ws.environ):
-                if not session.get("logged_in"):
-                    return redirect(with_query_string(url_for('auth.login'), "next", request.url))
-            with suppress(SystemError, OSError):
-                for raw_msg in iter(ws.receive, None):
-                    msg = json.loads(raw_msg.decode())
-                    for dev in msg["devices"]:
-                        uwsgi.mule_msg(b"bt send " + dev.encode() + b" " + pack("B", msg["angle"]))
+            uwsgi.mule_msg(b"bt scan on", 1)
+            try:
+                with app.request_context(ws.environ):
+                    if not session.get("logged_in"):
+                        return redirect(with_query_string(url_for('auth.login'), "next", request.url))
+                with suppress(SystemError, OSError):
+                    for raw_msg in iter(ws.receive, None):
+                        msg = json.loads(raw_msg.decode())
+                        #for mule, dev in zip(cycle(range(1, NUM_BT_WORKERS+1)), msg["devices"]):
+                        for dev in msg["devices"]:
+                            uwsgi.mule_msg(b"bt send " + dev.encode() + b" " + pack("B", msg["angle"]))
+            finally:
+                uwsgi.mule_msg(b"bt scan off", 1)

@@ -17,8 +17,19 @@
         <span aria-hidden="true">&times;</span>
       </button>
     </div>
+    <ul id="bt-devices" class="form-group">
+      {% for device in devices %}
+      <li>
+        <span class="btn-group bt-device"{% if is_egg and not device['connected'] %} title="Potential egg"{% endif %}>
+          <label class="btn btn-outline-{{ 'success' if device['connected'] else ('primary' if is_egg else 'secondary') }}" title="RSSI: {{ device['rssi'] if device['rssi'] is not none else 'unknown' }}" disabled>
+            <input id="{{ device['macaddr']|replace(':','-') }}" type="checkbox">
+          </label>
+          <label class="btn btn-outline-{{ 'success' if device['connected'] else ('primary' if is_egg else 'secondary') }}"><samp>{{ device['macaddr'] }}</samp>{% if device['name'] is not none %} ({{ device['name'] }}){% endif %}</label>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
     <input id="angle" type="range" min="0" max="180" value="90">
-    <p>{{ 'Connecting to' if connecting else 'Disconnecting from' }} device <code>{{ macaddr }}</code>...</p>
 {% endblock %}
 {% block script %}
 <script>
@@ -48,19 +59,43 @@ socket.addEventListener("error", function(evt) {
     err.removeAttribute("hidden");
 });
 
-document.getElementById("angle").addEventListener("change", function(evt) {
-    if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({
-            "devices": ["80:7D:3A:81:54:3E", "B4:E6:2D:C8:58:C7", "B4:E6:2D:C8:58:C7"],
-            "angle": parseInt(this.value)
-        }));
+const FPS = 5;
+var shouldUpdate = true;
+setInterval(function() { shouldUpdate = true; }, 1000/FPS);
+function startUpdate() {
+  const FPS = 5;
+  if (update === null) {
+    update = setInterval(function() { shouldUpdate = true; }, 1000/FPS);
+  }
+}
+
+const angle = document.getElementById("angle");
+var devices = [];
+var update = null;
+function updateAngle() {
+    if (shouldUpdate && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({"devices": devices, "angle": parseInt(angle.value)}));
+        shouldUpdate = false;
     }
-}, false);
+}
+angle.addEventListener("change", updateAngle, false);
+
 
 Array.prototype.forEach.call(document.getElementsByClassName("alert"), function(el) {
     el.getElementsByTagName("button")[0].addEventListener("click", function() {
         el.setAttribute("hidden", true);
     });
+});
+
+Array.prototype.forEach.call(document.getElementsByTagName("input"), function(el) {
+    let macaddr = el.id.replace(/-/g, ":");
+    el.addEventListener("change", function(evt) {
+        if (el.checked) {
+            devices.push(macaddr);
+        } else {
+            devices = devices.filter(item => item !== macaddr);
+        }
+    }, false);
 });
 
 if (socket.readyState === WebSocket.OPEN) {
