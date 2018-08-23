@@ -114,3 +114,4 @@ config.py
 
 .uwsgi_plugins_builder/
 sw/uwsgi-capture/
+sw/Adafruit_BluefruitLE/
