@@ -98,7 +98,7 @@ def dummy_worker():
             wait = 1 + random.random() * 2
             if has_uwsgi:
                 uwsgi.signal(1)
-                for raw_msg in filter(lambda x: x.startswith(b"bt "), mule_msg_iter(timeout)):
+                for raw_msg in filter(lambda x: x.startswith(b"bt "), mule_msg_iter(wait)):
                     msg = raw_msg.split(b" ")[1:]
                     if msg == [b"restart"]:
                         return
