@@ -1,3 +1,3 @@
-The hardware described in this repository (i.e. the contents of the hw folder) is under a CC-BY-NC-SA license.
-The software in this repository (the contents of the sw folder) is dual licensed under the WTFPL or the MIT license if you're really lame.
-See hw/LICENSE and sw/LICENSE for more details.
+Everything in this repository except the Basket Case (anything in the hw/case folder) is licensed under the WTFPL, or the MIT license if you're really lame.
+The Basket Case is licensed under a CC-BY-NC-SA license.
+See hw/case/LICENSE and sw/LICENSE for more details.

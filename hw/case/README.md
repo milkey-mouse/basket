@@ -1,6 +1,6 @@
-# Hardware
+# Basket Case
 
-This is a case for a Raspberry Pi running Basket (referred to as the Basket Case).
+This is a case for a Raspberry Pi, ostensibly running Basket.
 
 ![Picture of the first Basket Case](case.jpg)
 
