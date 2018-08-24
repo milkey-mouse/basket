@@ -1,5 +1,11 @@
 # Basket Server
 
+![Screenshot of main page of Basket Server](screenshots/diag.png)
+
+![Screenshot of Bluetooth page of Basket Server](screenshots/bt.png)
+
+![Screenshot of control page of Basket Server](screenshots/ctrl.png)
+
 This server process can run on a Raspberry Pi (perhaps in the [Basket Case™](../hw/case)?) or other system with Bluetooth and control [Bluetooth egg cups](../hw/cup).
 
 For stereo vision and redundancy, we'd recommend dividing the egg cups evenly between multiple instances of the Basket Server; after all, one shouldn't put all their eggs in one Basket™.
