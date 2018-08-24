@@ -4,7 +4,7 @@ These parts assemble into what looks like a perfectly normal egg cup:
 
 ![Picture of the first Bluetooth egg cup](egg.jpg)
 
-The twist is that the top half is separate from the base and can be rotated by a servo in the base. Additionally, by cramming an [ESP-WROOM-32](https://www.adafruit.com/product/3320) module into the base as well, the servo's position can be controlled over Bluetooth.
+The twist (pun intended) is that the top half is separate from the base and can be rotated by a servo in the base. Additionally, by cramming an [ESP-WROOM-32](https://www.adafruit.com/product/3320) module into the base as well, the servo's position can be controlled over Bluetooth.
 
 The cup was designed in [Fusion 360](https://www.autodesk.com/products/fusion-360/overview). A `.f3d` file is included for editing in Fusion and a STEP file is included for editing elsewhere. STLs are also included for 3d printing without modification.
 
