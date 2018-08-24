@@ -13,9 +13,10 @@ The cup was designed in [Fusion 360](https://www.autodesk.com/products/fusion-36
 To assemble an egg cup, you will need:
 
 - one of each [3D printed part](printable/)
-- an [ESP32 module](https://www.amazon.com/dp/B07BSSPLXP)
-- a [3.3V regulator](https://www.amazon.com/dp/B01N1I1LXH)
+- a [micro USB breakout](https://www.amazon.com/dp/B07B5ZDLJY)
 - an [SG90 micro servo](https://www.amazon.com/dp/B00X7CJZWM)
+- a [3.3V regulator](https://www.amazon.com/dp/B01N1I1LXH)
+- an [ESP32 module](https://www.amazon.com/dp/B07BSSPLXP)
 - thin (~26 AWG) solid-core wire
 
 # License
